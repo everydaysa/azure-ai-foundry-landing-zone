@@ -13,7 +13,7 @@ AI platforms usually leak through credentials: model API keys in app settings, s
    - `pull_request` or `ref:refs/heads/main` → plan identity (Reader)
    - `environment:dev` → dev deploy identity (rg-aifz-dev only)
    - `environment:prod` → prod deploy identity (rg-aifz-prod only, behind a GitHub environment approval)
-2. **App → AI Foundry:** the AKS workload uses **Workload Identity**: the cluster's OIDC issuer, a federated credential, and a Kubernetes ServiceAccount. Foundry has `local_auth_enabled = false`, so API keys do not exist.
+2. **App → AI Foundry:** the AKS workload uses **Workload Identity**: the cluster's OIDC issuer, a federated credential, and a Kubernetes ServiceAccount. Foundry has `local_auth_enabled = false`, so API keys cannot authenticate (they exist on the resource but are rejected).
 3. **Terraform → state:** the state account has `shared_access_key_enabled = false`, and backends use `use_azuread_auth = true`.
 4. **Privilege escalation guard:** deploy identities get *Role Based Access Control Administrator* with an **ABAC condition**. They may assign only an allow-list of data-plane roles, and only to service principals.
 
