@@ -60,8 +60,19 @@ The last command should show four roles, all scoped to `rg-aifz-dev`, with `cond
 
 ## Teardown (last, after every environment is destroyed)
 
+State is protected twice, on purpose:
+
+| Guard | Stops |
+|---|---|
+| `lifecycle { prevent_destroy = true }` on the state account + container | `terraform destroy` / a plan that would replace them |
+| `CanNotDelete` management lock | Deletes from the portal, CLI or any other tool |
+
+To tear down deliberately:
+
 ```bash
-terraform destroy    # removes the delete lock first, then everything above
+# 1. In main.tf, change BOTH `prevent_destroy = true` lines to false
+# 2. Then:
+terraform destroy    # removes the lock, then everything above
 ```
 
 > The bootstrap state file (`terraform.tfstate` in this folder) is git-ignored. Keep it until teardown, or migrate it into the storage account it created by adding an `azurerm` backend block and running `terraform init -migrate-state`.

@@ -48,7 +48,7 @@ variable "pipeline_assignable_roles" {
     Administrator and RBAC Administrator itself - can never be granted by CI.
   EOT
   type        = set(string)
-  default     = [
+  default = [
     "AcrPull",
     "Cognitive Services OpenAI User",
     "Cognitive Services User",

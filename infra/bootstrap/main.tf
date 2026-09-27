@@ -84,6 +84,14 @@ resource "azurerm_storage_account" "tfstate" {
   }
 
   tags = local.tags
+
+  # Terraform refuses to destroy state, even on `terraform destroy`.
+  # The management lock below protects against portal/CLI deletes; this protects
+  # against Terraform itself (it would otherwise remove the lock first).
+  # Teardown: set to false deliberately - see README.md.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Created through the ARM control plane (storage_account_id), so it works
@@ -94,6 +102,10 @@ resource "azurerm_storage_container" "tfstate" {
   name                  = "tfstate"
   storage_account_id    = azurerm_storage_account.tfstate.id
   container_access_type = "private"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_management_lock" "tfstate" {
