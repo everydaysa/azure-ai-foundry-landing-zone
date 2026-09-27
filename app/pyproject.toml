@@ -1,0 +1,22 @@
+[project]
+name = "aifz-app"
+version = "0.1.0"
+description = "Keyless FastAPI service that calls Azure AI Foundry with its AKS workload identity."
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E/F: errors · I: imports · B: bugbear · UP: modern syntax · S: security (bandit rules)
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # assert is how pytest works
