@@ -1,0 +1,49 @@
+# In-cluster smoke test. The API server is private and the app has no public
+# endpoint, so the test runs INSIDE the cluster as a restricted, non-root Job
+# labelled as an allowed client (see NetworkPolicy client-egress-to-app).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: aifz-smoke-test
+  namespace: ai-app
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 900
+  template:
+    metadata:
+      labels:
+        aifz/client: "true"
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: curl
+          image: curlimages/curl:8.11.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              for path in healthz readyz whoami; do
+                echo "== GET /$path"
+                curl -sS --fail-with-body --max-time 20 "http://aifz-app/$path"; echo
+              done
+              echo "== POST /chat"
+              curl -sS --fail-with-body --max-time 60 -X POST http://aifz-app/chat \
+                -H 'content-type: application/json' \
+                -d '{"prompt":"In one sentence: why is a keyless workload identity safer than an API key?"}'
+              echo
+              echo "SMOKE TEST PASSED"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 200m, memory: 64Mi }

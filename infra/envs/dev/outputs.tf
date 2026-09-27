@@ -62,6 +62,11 @@ output "application_insights_connection_string" {
   sensitive   = true
 }
 
+output "private_endpoints_cidr" {
+  description = "Private Endpoint subnet CIDR."
+  value       = module.stack.private_endpoints_cidr
+}
+
 output "egress_public_ip" {
   description = "Cluster egress IP."
   value       = module.stack.egress_public_ip

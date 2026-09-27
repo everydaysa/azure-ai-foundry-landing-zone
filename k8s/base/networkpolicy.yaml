@@ -1,0 +1,120 @@
+# ─── Network doors for the ai-app namespace (enforced by Cilium) ──────────
+#
+#   default: NOTHING in or out
+#   app pod ─ DNS ─────────────────────▶ kube-dns (53)
+#   app pod ─ 443 ─────────────────────▶ Private Endpoint subnet (Foundry, Key Vault)
+#   app pod ─ 443 ─────────────────────▶ public internet: Entra ID token exchange + Azure Monitor
+#                                         (NOT private ranges, NOT 169.254.0.0/16 → no IMDS)
+#   clients labelled aifz/client=true ─ 8080 ──▶ app pod
+#
+# Blocking 169.254.169.254 (IMDS) means a compromised pod cannot borrow the
+# NODE's managed identity - it only ever has its own workload identity.
+# Limit (documented, ADR-0008): "internet 443" is CIDR-scoped, not FQDN-scoped.
+# FQDN policies need Cilium with Advanced Container Networking Services.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ai-app
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: ai-app
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-egress-private-endpoints
+  namespace: ai-app
+spec:
+  podSelector:
+    matchLabels:
+      app: aifz-app
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - ipBlock:
+            # Replaced per environment with the PE subnet (e.g. 10.10.4.0/24).
+            cidr: PLACEHOLDER_PE_CIDR
+      ports:
+        - { protocol: TCP, port: 443 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-egress-entra-and-monitor
+  namespace: ai-app
+spec:
+  podSelector:
+    matchLabels:
+      app: aifz-app
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8       # VNet + everything else private
+              - 172.16.0.0/12    # includes the service CIDR
+              - 192.168.0.0/16   # pod overlay CIDR - no pod-to-pod lateral movement
+              - 169.254.0.0/16   # link-local: IMDS (169.254.169.254) and friends
+              - 100.64.0.0/10    # carrier-grade NAT range
+      ports:
+        - { protocol: TCP, port: 443 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-ingress-from-clients
+  namespace: ai-app
+spec:
+  podSelector:
+    matchLabels:
+      app: aifz-app
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              aifz/client: "true"
+      ports:
+        - { protocol: TCP, port: 8080 }
+---
+# Pods explicitly marked as clients (e.g. the smoke test) may call the app.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: client-egress-to-app
+  namespace: ai-app
+spec:
+  podSelector:
+    matchLabels:
+      aifz/client: "true"
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: aifz-app
+      ports:
+        - { protocol: TCP, port: 8080 }

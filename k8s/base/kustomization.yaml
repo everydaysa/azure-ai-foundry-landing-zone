@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-app
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: aifz-app
+      app.kubernetes.io/part-of: azure-ai-foundry-landing-zone
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - pdb.yaml
+  - networkpolicy.yaml

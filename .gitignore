@@ -62,3 +62,6 @@ _incoming/
 
 # ─── Chat downloads saved by the Claude desktop app ───
 Claude outputs/
+
+# ─── Kubernetes values generated at deploy time from `terraform output` ───
+k8s/overlays/*/generated/

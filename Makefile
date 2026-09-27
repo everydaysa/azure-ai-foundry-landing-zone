@@ -113,6 +113,18 @@ plan: init ## terraform plan for ENV (default dev)
 apply: ## Apply the saved plan for ENV
 	terraform -chdir=$(ENV_DIR) apply -input=false tfplan
 
+.PHONY: deploy-app
+deploy-app: ## Build, push (JIT firewall) and deploy the app to ENV via az aks command invoke
+	scripts/deploy-app.sh $(ENV)
+
+.PHONY: smoke-test
+smoke-test: ## Run the in-cluster smoke test against ENV (/healthz /readyz /whoami /chat)
+	scripts/smoke-test.sh $(ENV)
+
+.PHONY: k8s-render
+k8s-render: ## Render the ENV overlay locally (needs generated/*.env from a previous deploy-app)
+	kubectl kustomize k8s/overlays/$(ENV)
+
 .PHONY: output
 output: ## Show ENV outputs (endpoints, names, identities - no secrets)
 	terraform -chdir=$(ENV_DIR) output

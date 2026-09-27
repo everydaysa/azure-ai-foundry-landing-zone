@@ -1,0 +1,14 @@
+# ClusterIP only - nothing in this platform is exposed to the internet.
+apiVersion: v1
+kind: Service
+metadata:
+  name: aifz-app
+  namespace: ai-app
+spec:
+  type: ClusterIP
+  selector:
+    app: aifz-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

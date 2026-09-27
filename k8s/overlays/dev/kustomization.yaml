@@ -1,0 +1,50 @@
+# dev overlay. Environment values are NOT committed: scripts/deploy-app.sh
+# writes generated/app.env and generated/deploy.env from `terraform output`
+# (endpoint, identity client id, image digest, PE subnet) at deploy time.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-app
+
+resources:
+  - ../../base
+
+configMapGenerator:
+  # Runtime settings the app reads (no secrets: endpoint, deployment, limits).
+  - name: aifz-app-config
+    envs:
+      - generated/app.env
+
+  # Deploy-time parameters used only to fill placeholders below. The
+  # local-config annotation keeps this ConfigMap OUT of the rendered output.
+  - name: deploy-params
+    envs:
+      - generated/deploy.env
+    options:
+      disableNameSuffixHash: true
+      annotations:
+        config.kubernetes.io/local-config: "true"
+
+replacements:
+  - source: { kind: ConfigMap, name: deploy-params, fieldPath: data.IMAGE }
+    targets:
+      - select: { kind: Deployment, name: aifz-app }
+        fieldPaths:
+          - "spec.template.spec.containers.[name=app].image"
+  - source: { kind: ConfigMap, name: deploy-params, fieldPath: data.WORKLOAD_IDENTITY_CLIENT_ID }
+    targets:
+      - select: { kind: ServiceAccount, name: foundry-app }
+        fieldPaths:
+          - "metadata.annotations.[azure.workload.identity/client-id]"
+  - source: { kind: ConfigMap, name: deploy-params, fieldPath: data.PRIVATE_ENDPOINTS_CIDR }
+    targets:
+      - select: { kind: NetworkPolicy, name: app-egress-private-endpoints }
+        fieldPaths:
+          - "spec.egress.0.to.0.ipBlock.cidr"
+
+patches:
+  - target: { kind: Deployment, name: aifz-app }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2

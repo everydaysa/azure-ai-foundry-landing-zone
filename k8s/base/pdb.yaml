@@ -1,0 +1,12 @@
+# Node upgrades (patch channel + node image updates) drain nodes; keep at
+# least one replica serving while that happens.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: aifz-app
+  namespace: ai-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: aifz-app

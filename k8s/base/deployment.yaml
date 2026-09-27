@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aifz-app
+  namespace: ai-app
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: aifz-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: aifz-app
+        # Tells the workload identity webhook to inject AZURE_CLIENT_ID,
+        # AZURE_TENANT_ID, AZURE_FEDERATED_TOKEN_FILE and the projected token.
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: foundry-app
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: aifz-app
+
+      containers:
+        - name: app
+          # Always deployed BY DIGEST (immutable): scripts/deploy-app.sh and CI
+          # replace this placeholder with <acr>.azurecr.io/aifz-app@sha256:<digest>.
+          image: placeholder.azurecr.io/aifz-app@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          # Always = every pod start re-checks the registry with the kubelet's
+          # identity, so revoking AcrPull takes effect even for cached images.
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: aifz-app-config
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            privileged: false
+            capabilities:
+              drop: ["ALL"]
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 384Mi
+
+          # Startup: allow ~60 s for the first Entra token exchange.
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 3
+          # Ready only when the identity can obtain a token - a pod with broken
+          # identity wiring never receives traffic.
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        # The root filesystem is read-only; Python and the telemetry exporter's
+        # retry buffer get a small, memory-backed scratch dir.
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi

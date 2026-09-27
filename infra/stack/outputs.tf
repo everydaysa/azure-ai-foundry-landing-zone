@@ -73,6 +73,11 @@ output "application_insights_connection_string" {
   sensitive   = true
 }
 
+output "private_endpoints_cidr" {
+  description = "Private Endpoint subnet - the app's NetworkPolicy allows 443 only to this range inside the VNet."
+  value       = module.network.subnet_prefixes.private_endpoints
+}
+
 output "egress_public_ip" {
   description = "The single static IP all cluster egress leaves from."
   value       = module.network.egress_public_ip
