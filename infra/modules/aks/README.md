@@ -44,11 +44,12 @@ No secret is stored anywhere. A different ServiceAccount, or the same one in ano
 | Observability | Container Insights via a Data Collection Rule with managed-identity auth; control-plane audit logs |
 | Least-privilege control plane | User-assigned identity with **Network Contributor on the VNet only**, granted *before* the cluster exists |
 
-Checkov: 17 passed, 3 skipped with justification (ADR-0007):
+Checkov: 17 passed, 4 skipped with justification (ADR-0007):
 
 | Skipped | Reason |
 |---|---|
 | CKV_AZURE_6 authorized IP ranges | Private cluster: there's no public API endpoint to restrict |
+| CKV_AZURE_170 paid SKU | Tier is per environment: Free in dev, Standard in prod (enforced by OPA) |
 | CKV_AZURE_117 disk encryption set | Platform-managed keys + host encryption; CMK disk encryption set is the regulated extension |
 | CKV_AZURE_232 critical-addons-only system pool | Single pool for dev cost; production adds a user pool |
 

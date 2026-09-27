@@ -9,9 +9,15 @@ SHELL := /bin/bash
 
 ENV       ?= dev
 ENV_DIR   := infra/envs/$(ENV)
-TF_DIRS    = $(shell find infra -name '*.tf' -not -path '*/.terraform/*' -exec dirname {} \; | sort -u)
+TF_DIRS    = $(shell find infra -name '*.tf' -not -path '*/.terraform/*' -not -path '*/tests/*' -exec dirname {} \; | sort -u)
+TEST_DIRS  = $(shell find infra/modules -name '*.tftest.hcl' -exec dirname {} \; | xargs -n1 dirname | sort -u)
 IMAGE     ?= aifz-app
 TAG       ?= local
+
+# Remote state lives in the bootstrap storage account. CI passes its name as a
+# variable; locally it is discovered with the Azure CLI (you must be logged in).
+TFSTATE_RG              ?= rg-aifz-bootstrap
+TFSTATE_STORAGE_ACCOUNT ?= $(shell az storage account list -g $(TFSTATE_RG) --query "[?starts_with(name,'staifztfstate')].name | [0]" -o tsv 2>/dev/null)
 
 .PHONY: help
 help: ## List available targets
@@ -38,6 +44,14 @@ validate: ## terraform validate every module/env (no backend, no Azure login)
 	  echo "==> validate $$d"; \
 	  terraform -chdir=$$d init -backend=false -input=false >/dev/null; \
 	  terraform -chdir=$$d validate -no-color; \
+	done
+
+.PHONY: test
+test: ## Run every module's offline unit tests (terraform test, mocked provider)
+	@for d in $(TEST_DIRS); do \
+	  echo "==> test $$d"; \
+	  terraform -chdir=$$d init -backend=false -input=false >/dev/null; \
+	  terraform -chdir=$$d test -no-color; \
 	done
 
 .PHONY: lint
@@ -68,7 +82,7 @@ docker-build: ## Build the app container image locally
 
 # ─── Aggregate (what CI runs on every PR) ─────────────────────────────────
 .PHONY: ci
-ci: fmt-check validate lint policy app-test ## Run every local check
+ci: fmt-check validate test lint policy app-test ## Run every local check
 
 # ─── Deploy (requires `az login`) ─────────────────────────────────────────
 .PHONY: bootstrap
@@ -76,17 +90,35 @@ bootstrap: ## One-time: create remote state + GitHub OIDC identities
 	terraform -chdir=infra/bootstrap init
 	terraform -chdir=infra/bootstrap apply
 
+.PHONY: preflight
+preflight: ## Check Azure prerequisites (login, host encryption, state account)
+	@az account show --query "{subscription:name, id:id}" -o table
+	@state=$$(az feature show --namespace Microsoft.Compute --name EncryptionAtHost --query properties.state -o tsv); \
+	  echo "EncryptionAtHost feature: $$state"; [ "$$state" = "Registered" ] || { echo "Run: az feature register --namespace Microsoft.Compute --name EncryptionAtHost"; exit 1; }
+	@[ -n "$(TFSTATE_STORAGE_ACCOUNT)" ] || { echo "State storage account not found in $(TFSTATE_RG) - run 'make bootstrap' first."; exit 1; }
+	@echo "State storage account: $(TFSTATE_STORAGE_ACCOUNT)"
+
+.PHONY: init
+init: ## terraform init for ENV against the remote state backend
+	@[ -n "$(TFSTATE_STORAGE_ACCOUNT)" ] || { echo "State storage account not found - run 'az login' and 'make bootstrap' first."; exit 1; }
+	terraform -chdir=$(ENV_DIR) init -input=false -reconfigure \
+	  -backend-config=backend.hcl \
+	  -backend-config="storage_account_name=$(TFSTATE_STORAGE_ACCOUNT)"
+
 .PHONY: plan
-plan: ## terraform plan for ENV (default dev)
-	terraform -chdir=$(ENV_DIR) init -input=false
+plan: init ## terraform plan for ENV (default dev)
 	terraform -chdir=$(ENV_DIR) plan -input=false -out=tfplan
 
 .PHONY: apply
 apply: ## Apply the saved plan for ENV
 	terraform -chdir=$(ENV_DIR) apply -input=false tfplan
 
+.PHONY: output
+output: ## Show ENV outputs (endpoints, names, identities - no secrets)
+	terraform -chdir=$(ENV_DIR) output
+
 .PHONY: destroy
-destroy: ## Tear down ENV (asks for confirmation)
+destroy: init ## Tear down ENV (asks for confirmation)
 	@read -p "Destroy ALL resources in '$(ENV)'? Type the env name to confirm: " c; \
 	  [ "$$c" = "$(ENV)" ] || { echo "Aborted."; exit 1; }
 	terraform -chdir=$(ENV_DIR) destroy -input=false

@@ -25,6 +25,7 @@ The application must call AI Foundry, Key Vault and App Insights without secrets
 | Checkov | Trade-off | Production extension |
 |---|---|---|
 | CKV_AZURE_6 | N/A for private clusters | — |
+| CKV_AZURE_170 | Free tier in dev (cost) | Prod uses Standard; enforced by an OPA policy on the prod plan |
 | CKV_AZURE_117 | Platform-managed disk keys (+ host encryption) | Disk Encryption Set with a customer-managed key |
 | CKV_AZURE_232 | Single node pool (dev cost) | Separate user pool; system pool with `only_critical_addons_enabled = true` |
 

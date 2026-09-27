@@ -46,6 +46,7 @@ resource "azurerm_user_assigned_identity" "app" {
 resource "azurerm_kubernetes_cluster" "this" {
   #checkov:skip=CKV_AZURE_6:Private cluster - the API server has no public endpoint, so authorized IP ranges do not apply.
   #checkov:skip=CKV_AZURE_117:Platform-managed disk encryption + host encryption are used; a customer-managed disk encryption set is the regulated-workload extension (ADR-0007).
+  #checkov:skip=CKV_AZURE_170:SKU tier is chosen per environment - Free in dev (cost), Standard in prod. An OPA policy on the plan (Step 13) fails any prod plan that is not Standard.
   #checkov:skip=CKV_AZURE_232:Single node pool to keep dev cost low; production adds a separate user pool and sets only_critical_addons_enabled (ADR-0007).
 
   name                = local.cluster_name
