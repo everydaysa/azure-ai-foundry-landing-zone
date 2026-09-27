@@ -89,7 +89,7 @@ resource "azurerm_kubernetes_cluster" "this" {
     temporary_name_for_rotation = "systemtmp"
     vm_size                     = var.node_vm_size
     vnet_subnet_id              = var.aks_nodes_subnet_id
-    zones                       = var.availability_zones
+    zones                       = length(var.availability_zones) > 0 ? var.availability_zones : null
 
     auto_scaling_enabled = true
     min_count            = var.node_min_count

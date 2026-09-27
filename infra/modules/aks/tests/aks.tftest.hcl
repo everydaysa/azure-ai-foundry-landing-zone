@@ -133,6 +133,19 @@ run "policy_and_monitoring_addons" {
   }
 }
 
+run "empty_zone_list_means_regional_placement" {
+  command = plan
+
+  variables {
+    availability_zones = []
+  }
+
+  assert {
+    condition     = try(length(azurerm_kubernetes_cluster.this.default_node_pool[0].zones), 0) == 0
+    error_message = "An empty zone list must produce a regional (non-zonal) node pool."
+  }
+}
+
 run "rejects_min_greater_than_max" {
   command = plan
 

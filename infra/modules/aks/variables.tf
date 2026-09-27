@@ -90,7 +90,7 @@ variable "node_os_disk_size_gb" {
 }
 
 variable "availability_zones" {
-  description = "Zones to spread nodes across."
+  description = "Zones to spread nodes across. [] = regional placement (for subscriptions/regions where AKS zonal placement is unavailable)."
   type        = list(string)
   default     = ["1", "2", "3"]
 }

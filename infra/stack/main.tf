@@ -96,6 +96,7 @@ module "aks" {
   kubernetes_version         = var.kubernetes_version
   sku_tier                   = var.aks_sku_tier
   node_vm_size               = var.aks_node_vm_size
+  availability_zones         = var.aks_availability_zones
   node_min_count             = var.aks_node_min_count
   node_max_count             = var.aks_node_max_count
   tags                       = local.common.tags

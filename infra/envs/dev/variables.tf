@@ -47,6 +47,11 @@ variable "aks_node_vm_size" {
   type        = string
 }
 
+variable "aks_availability_zones" {
+  description = "AKS node pool zones ([] = regional)."
+  type        = list(string)
+}
+
 variable "aks_node_min_count" {
   description = "AKS autoscaler minimum."
   type        = number

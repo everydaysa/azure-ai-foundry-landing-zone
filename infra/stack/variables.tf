@@ -68,6 +68,12 @@ variable "aks_node_vm_size" {
   default     = "Standard_D2ds_v5"
 }
 
+variable "aks_availability_zones" {
+  description = "Zones for the AKS node pool; [] for regional placement."
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}
+
 variable "aks_node_min_count" {
   description = "Autoscaler minimum nodes."
   type        = number
