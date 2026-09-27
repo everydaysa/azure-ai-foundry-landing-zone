@@ -27,8 +27,8 @@ variables {
 
   model_deployments = {
     chat = {
-      model_name    = "gpt-4.1-mini"
-      model_version = "2025-04-14"
+      model_name    = "gpt-5.4-mini"
+      model_version = "2026-03-17"
       sku_name      = "DataZoneStandard"
       capacity      = 10
     }
@@ -135,8 +135,8 @@ run "rejects_provisioned_sku" {
   variables {
     model_deployments = {
       chat = {
-        model_name    = "gpt-4.1-mini"
-        model_version = "2025-04-14"
+        model_name    = "gpt-5.4-mini"
+        model_version = "2026-03-17"
         sku_name      = "ProvisionedManaged"
         capacity      = 10
       }

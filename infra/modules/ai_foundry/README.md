@@ -63,9 +63,9 @@ Model availability and quota vary by region **and** subscription. Check both bef
 
 ```bash
 az cognitiveservices model list --location eastus2 \
-  --query "[?model.name=='gpt-4.1-mini'].{v:model.version, status:model.lifecycleStatus, retires:model.deprecation.inference}" -o table
+  --query "[?model.name=='gpt-5.4-mini'].{v:model.version, status:model.lifecycleStatus, retires:model.deprecation.inference}" -o table
 az cognitiveservices usage list --location eastus2 \
-  --query "[?contains(name.value,'gpt-4.1-mini')].{quota:name.value, used:currentValue, limit:limit}" -o table
+  --query "[?contains(name.value,'gpt-5.4-mini')].{quota:name.value, used:currentValue, limit:limit}" -o table
 ```
 
 ## Teardown note

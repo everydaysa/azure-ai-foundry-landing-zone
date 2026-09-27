@@ -65,8 +65,8 @@ variable "project_name" {
 variable "model_deployments" {
   description = <<-EOT
     Model deployments keyed by deployment name (the name the app calls).
-      model_name     e.g. "gpt-4.1-mini"
-      model_version  pinned version, e.g. "2025-04-14"
+      model_name     e.g. "gpt-5.4-mini"
+      model_version  pinned version, e.g. "2026-03-17"
       sku_name       DataZoneStandard (US data zone) | GlobalStandard | Standard
       capacity       thousands of tokens per minute (TPM) - must fit your quota
   EOT
