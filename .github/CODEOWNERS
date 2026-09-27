@@ -1,0 +1,6 @@
+# Every change needs review from the owner; infra and policy are the
+# security-critical paths, so they are called out explicitly.
+*                   @kenwulff
+/infra/             @kenwulff
+/policy/            @kenwulff
+/.github/workflows/ @kenwulff

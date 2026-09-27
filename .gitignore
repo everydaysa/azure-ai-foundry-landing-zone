@@ -1,0 +1,61 @@
+# ─── Terraform ────────────────────────────────────────────────
+# Provider binaries and module cache (re-downloaded by `terraform init`)
+**/.terraform/*
+# State files contain resource IDs and can contain secrets — they live
+# ONLY in the remote Azure Storage backend, never in git.
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+# Local overrides and variable files that may hold personal values.
+# Committed env settings use the explicit name `terraform.tfvars` (no secrets).
+*.auto.tfvars
+*.auto.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# NOTE: .terraform.lock.hcl IS committed — it pins provider checksums.
+
+# ─── Secrets / local config ───────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+kubeconfig*
+.kube/
+
+# ─── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# ─── Scan / build output ──────────────────────────────────────
+results_*.sarif
+*.sarif
+checkov-report*
+dist/
+build/
+
+# ─── OS / editor ──────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# ─── Hand-off folder for files remote tools may not write directly ───
+_incoming/
