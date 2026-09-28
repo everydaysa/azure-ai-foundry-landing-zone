@@ -129,6 +129,18 @@ deploy-app: ## Build, push (JIT firewall) and deploy the app to ENV via az aks c
 smoke-test: ## Run the in-cluster smoke test against ENV (/healthz /readyz /whoami /chat)
 	scripts/smoke-test.sh $(ENV)
 
+.PHONY: ask
+ask: ## Ask the model from your laptop: make ask ENV=dev PROMPT="your question"
+	@[ -n "$(PROMPT)" ] || { echo 'Usage: make ask ENV=dev PROMPT="your question"'; exit 1; }
+	scripts/ask.sh $(ENV) "$(PROMPT)"
+
+.PHONY: security-test
+security-test: ## Prove the security controls on ENV (PASS/FAIL per control)
+	scripts/security-test.sh $(ENV)
+
+.PHONY: verify
+verify: smoke-test security-test ## Full live verification: smoke test + security tests
+
 .PHONY: k8s-render
 k8s-render: ## Render the ENV overlay locally (needs generated/*.env from a previous deploy-app)
 	kubectl kustomize k8s/overlays/$(ENV)

@@ -1,0 +1,41 @@
+# NetworkPolicy probe: an UNLABELLED pod (no aifz/client=true) tries to reach
+# the app. Default-deny must stop it. The Job always succeeds; its log line
+# says PASS (blocked) or FAIL (reached the app). Used by scripts/security-test.sh.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: aifz-netpol-probe
+  namespace: ai-app
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10002
+        runAsGroup: 10002
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: curl
+          image: curlimages/curl:8.11.1@sha256:c1fe1679c34d9784c1b0d1e5f62ac0a79fca01fb6377cdd33e90473c6f9f9a69
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if curl -sS --max-time 5 -o /dev/null http://aifz-app/healthz; then
+                echo "FAIL  NetworkPolicy blocks unlabelled pods: an unlabelled pod reached the app"
+              else
+                echo "PASS  NetworkPolicy blocks unlabelled pods: connection refused/timed out"
+              fi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 32Mi }

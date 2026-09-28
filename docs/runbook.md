@@ -107,6 +107,9 @@ gh workflow run deploy-prod.yml --ref main
 
 ```bash
 make smoke-test ENV=dev          # /healthz /readyz /whoami /chat from inside the cluster
+make security-test ENV=dev       # 11 controls: keys off, private endpoints/cluster, IMDS blocked, NetworkPolicy…
+make verify ENV=dev              # both of the above
+make ask ENV=dev PROMPT="Explain a private endpoint in one sentence."   # talk to the model
 make policy-k8s ENV=dev          # rendered manifests comply
 make plan ENV=dev && make policy-plan ENV=dev   # live infra matches the code and complies
 make output ENV=dev              # endpoints and names (no secrets in outputs)
