@@ -259,7 +259,7 @@ flowchart LR
 
 - **One workspace per environment.** A single query can correlate an app error with the pod restart, the API-server audit entry and the model's request log.
 - **Nothing can write telemetry with a key.** Local auth is disabled on both Log Analytics and App Insights. A leaked connection string can't inject or spoof data.
-- **Cost guard in dev:** a 1 GB/day cap and 30-day retention. Prod keeps 90 days and has no cap, because security logs must never be dropped.
+- **Cost guard in dev:** a 2 GB/day cap (about 2× the measured idle volume) and 30-day retention. Prod keeps 90 days and has no cap, because security logs must never be dropped.
 
 See [observability.md](observability.md) for table names and ready-to-run KQL.
 
@@ -330,7 +330,7 @@ The full control-to-threat mapping is in [security.md](security.md).
 | Address space | 10.10.0.0/16 | 10.20.0.0/16 (never overlaps, so they can be peered) |
 | AKS tier / nodes | Free · 2–3 × D2ds_v4 · regional | **Standard (SLA)** · 3–5 × D2ds_v4 · zones 1–3 |
 | Model capacity | 10K tokens/min | 30K tokens/min |
-| Logs | 30 days · 1 GB/day cap | 90 days · no cap |
+| Logs | 30 days · 2 GB/day cap | 90 days · no cap |
 | Key Vault recovery | 7 days | 90 days |
 | Deploys | every merge to main | manual · required reviewer · fingerprint-checked |
 | Deploy identity | `id-aifz-gh-dev` (dev RG only) | `id-aifz-gh-prod` (prod RG only) |

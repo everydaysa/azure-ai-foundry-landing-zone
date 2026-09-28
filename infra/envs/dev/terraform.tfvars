@@ -3,9 +3,14 @@ environment   = "dev"
 location      = "eastus2"
 address_space = "10.10.0.0/16"
 
-# Monitoring: short retention + a 1 GB/day cap so a noisy bug can't run up the bill.
+# Monitoring: short retention + a daily cap so a noisy bug can't run up the bill.
+# Sized from measurement, not guesswork: idle dev ingests ~44 MB/hour (~1.05
+# GB/day) after the Container Insights trim - mostly AKS lease-heartbeat audit
+# rows (see docs/observability.md §3). A 1 GB cap would trip every day and drop
+# the security audit and app traces for the rest of that day; 2 GB leaves ~2x
+# headroom while still stopping a runaway bug.
 log_retention_days = 30
-log_daily_quota_gb = 1
+log_daily_quota_gb = 2
 
 # Key Vault: shortest recoverable window (purge protection is always on).
 key_vault_soft_delete_days = 7

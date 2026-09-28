@@ -37,7 +37,7 @@ This document explains what we protect, from whom, and how each threat is stoppe
 | I1 | **Information disclosure**: model reachable from internet | Public endpoint discovered | `public_network_access = false`; Private DNS | Foundry firewall | DNS resolves to 10.10.4.x in-cluster only; public call refused |
 | I2 | Deployment IDs in a public repo | Subscription/tenant ID in logs or PR comments | Not committed; masked in logs; scrubbed from PR comments; plan files never uploaded | Workflows | `.gitignore` · gitleaks in pre-commit and CI |
 | I3 | Secrets committed by mistake | Key pasted into code | gitleaks (pre-commit + full-history CI scan); nothing to commit anyway | CI | `secrets` check |
-| D1 | **Denial of service**: runaway log cost | Bug floods logs | Dev: 1 GB/day cap | Log Analytics | tfvars |
+| D1 | **Denial of service**: runaway log cost | Bug floods logs | Dev: 2 GB/day cap, sized at ~2× measured idle volume so it stops a runaway bug but never drops normal audit/traces | Log Analytics | tfvars |
 | D2 | Model quota exhaustion | Abuse of `/chat` | Capacity per deployment (TPM); app returns 429; prompt size limit (413) | Foundry + app | app tests |
 | E1 | **Elevation of privilege**: CI grants itself Owner | Malicious PR adds a role assignment | Plan identity is read-only; deploy identity's RBAC Admin is **ABAC-constrained** (7 allow-listed roles, service principals only) | Azure RBAC condition | OPA T8 (Owner/UAA/RBAC Admin by name or ID) |
 | E2 | Container escape / root in pod | Exploit in the app | Non-root UID 10001, read-only FS, drop ALL, no privilege escalation, seccomp | **PSA `restricted`** (API server rejects violations) | OPA K2–K4 · Checkov |

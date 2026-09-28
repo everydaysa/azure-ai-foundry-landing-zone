@@ -5,7 +5,7 @@ Each folder is a thin root module that calls [`../stack`](../stack) with its own
 | Setting | dev | prod |
 |---|---|---|
 | VNet | `10.10.0.0/16` | `10.20.0.0/16` |
-| Log retention / daily cap | 30 days / 1 GB | 90 days / unlimited |
+| Log retention / daily cap | 30 days / 2 GB (sized from measured volume) | 90 days / unlimited |
 | Key Vault soft-delete | 7 days | 90 days |
 | AKS tier / nodes | Free / 2–3 | Standard (SLA) / 3–5 |
 | Model | gpt-5.4-mini, DataZoneStandard, 10K TPM | same, 30K TPM |

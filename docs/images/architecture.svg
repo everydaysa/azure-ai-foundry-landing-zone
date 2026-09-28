@@ -159,7 +159,7 @@
 <text x="1000" y="780" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">ranges and IMDS excluded).</text>
 <rect x="680" y="840" width="967" height="125" rx="10" fill="#fff4ec" stroke="#ca5010" stroke-width="1.5"/>
 <text x="694" y="863" font-size="15" fill="#ca5010" font-weight="700" text-anchor="start">Log Analytics workspace log-aifz-dev  +  App Insights (workspace-based)</text>
-<text x="694" y="885" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Entra-only ingestion (local auth OFF): a leaked connection string can't write or forge telemetry · dev: 30 days, 1 GB/day cap</text>
+<text x="694" y="885" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Entra-only ingestion (local auth OFF): a leaked connection string can't write or forge telemetry · dev: 30 days, 2 GB/day cap</text>
 <text x="694" y="905" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">App: AppRequests · AppTraces (OpenTelemetry)   Cluster: ContainerLogV2 · KubeEvents · AKSAuditAdmin (every API write)</text>
 <text x="694" y="925" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Platform: AzureDiagnostics (Foundry, Key Vault) · ContainerRegistryLoginEvents / RepositoryEvents · AzureMetrics</text>
 <text x="694" y="948" font-size="12" fill="#ca5010" font-weight="600" text-anchor="start">One KQL query can put an app error, a pod event, an audit entry and a model call on the same timeline.</text>
