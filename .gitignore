@@ -65,3 +65,6 @@ Claude outputs/
 
 # ─── Kubernetes values generated at deploy time from `terraform output` ───
 k8s/overlays/*/generated/
+
+# ─── Private notes that must never be published (kept only on this machine) ───
+private/
