@@ -84,7 +84,7 @@ variable "node_max_count" {
 }
 
 variable "node_os_disk_size_gb" {
-  description = "Ephemeral OS disk size - must fit in the VM's temp disk (75 GiB on D2ds_v5)."
+  description = "Ephemeral OS disk size - must fit in the VM's temp disk (75 GiB on D2ds_v4/v5)."
   type        = number
   default     = 64
 }
@@ -105,6 +105,33 @@ variable "app_service_account" {
   description = "Kubernetes ServiceAccount the application runs as (bound to the app's managed identity)."
   type        = string
   default     = "foundry-app"
+}
+
+variable "container_insights_streams" {
+  description = "Container Insights streams to collect. Default: logs, events and inventory only (no Perf / ContainerInventory / InsightsMetrics)."
+  type        = list(string)
+  default = [
+    "Microsoft-ContainerLogV2",
+    "Microsoft-KubeEvents",
+    "Microsoft-KubePodInventory",
+    "Microsoft-KubeNodeInventory",
+  ]
+
+  validation {
+    condition     = length(var.container_insights_streams) > 0 && alltrue([for s in var.container_insights_streams : startswith(s, "Microsoft-")])
+    error_message = "Provide at least one Container Insights stream name (e.g. Microsoft-ContainerLogV2)."
+  }
+}
+
+variable "container_insights_interval" {
+  description = "How often Container Insights collects inventory/metrics: 1m-30m."
+  type        = string
+  default     = "5m"
+
+  validation {
+    condition     = can(regex("^([1-9]|[12][0-9]|30)m$", var.container_insights_interval))
+    error_message = "Interval must be between 1m and 30m, e.g. \"5m\"."
+  }
 }
 
 variable "tags" {

@@ -131,6 +131,26 @@ run "policy_and_monitoring_addons" {
     condition     = azurerm_monitor_data_collection_rule_association.container_insights.target_resource_id == azurerm_kubernetes_cluster.this.id
     error_message = "The Container Insights DCR must be associated with the cluster."
   }
+
+  assert {
+    condition     = !contains(azurerm_monitor_data_collection_rule.container_insights.data_flow[0].streams, "Microsoft-ContainerInsights-Group-Default") && !contains(azurerm_monitor_data_collection_rule.container_insights.data_flow[0].streams, "Microsoft-Perf")
+    error_message = "Container Insights must collect only the selected streams (not the all-streams default group, not Perf)."
+  }
+
+  assert {
+    condition     = contains(azurerm_monitor_data_collection_rule.container_insights.data_flow[0].streams, "Microsoft-ContainerLogV2")
+    error_message = "Container logs (ContainerLogV2) must always be collected."
+  }
+}
+
+run "rejects_invalid_container_insights_interval" {
+  command = plan
+
+  variables {
+    container_insights_interval = "45m"
+  }
+
+  expect_failures = [var.container_insights_interval]
 }
 
 run "empty_zone_list_means_regional_placement" {

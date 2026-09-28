@@ -158,6 +158,10 @@ resource "azurerm_federated_identity_credential" "app" {
 }
 
 # ─── Container Insights (managed-identity auth) ───────────────────────────
+# Collect only the streams the observability docs and queries use, every 5 min.
+# Measured on idle dev: the default group (every stream, every minute) sent
+# ~285 MB/day of Perf + ContainerInventory + InsightsMetrics that nothing read.
+# CPU/memory charts remain available as free platform metrics.
 resource "azurerm_monitor_data_collection_rule" "container_insights" {
   name                = "dcr-${local.cluster_name}-ci"
   location            = var.location
@@ -172,7 +176,7 @@ resource "azurerm_monitor_data_collection_rule" "container_insights" {
   }
 
   data_flow {
-    streams      = ["Microsoft-ContainerInsights-Group-Default"]
+    streams      = var.container_insights_streams
     destinations = ["central-workspace"]
   }
 
@@ -180,10 +184,10 @@ resource "azurerm_monitor_data_collection_rule" "container_insights" {
     extension {
       name           = "ContainerInsightsExtension"
       extension_name = "ContainerInsights"
-      streams        = ["Microsoft-ContainerInsights-Group-Default"]
+      streams        = var.container_insights_streams
       extension_json = jsonencode({
         dataCollectionSettings = {
-          interval               = "1m"
+          interval               = var.container_insights_interval
           namespaceFilteringMode = "Off"
           enableContainerLogV2   = true
         }
