@@ -6,7 +6,7 @@ A private, Entra-only AKS cluster whose workloads authenticate to Azure with **w
 you / CI ──(Entra token; `az aks command invoke`)──▶ API server (PRIVATE IP only)
                                                       Entra ID + Azure RBAC · local accounts OFF
 aks-<prefix>
- ├─ node pool "system": AzureLinux · D2ds_v5 ×2–3 · zones 1-3 · ephemeral OS · host encryption · no public IPs
+ ├─ node pool "system": AzureLinux · D*ds size + zones per environment (dev: D2ds_v4 ×2–3, regional) · ephemeral OS · host encryption · no public IPs
  │    CNI Overlay + Cilium (eBPF, NetworkPolicy) ── egress ──▶ NAT Gateway (network module)
  ├─ OIDC issuer ──▶ federated credential ──▶ id-<prefix>-app   (the app's Azure identity)
  │                  subject = system:serviceaccount:ai-app:foundry-app   ← only this SA

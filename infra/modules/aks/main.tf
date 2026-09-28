@@ -3,7 +3,7 @@
 #  you / CI ──(Entra token; `az aks command invoke`)──▶ API server (PRIVATE IP only)
 #                                                        Entra ID + Azure RBAC, local accounts OFF
 #  aks-<prefix>
-#   ├─ node pool: AzureLinux, D2ds_v5 ×2-3, zones 1-3, ephemeral OS, host encryption
+#   ├─ node pool: AzureLinux, D*ds (per env), autoscaled, zones per env, ephemeral OS, host encryption
 #   │    CNI Overlay + Cilium (network policy) ── egress ──▶ NAT Gateway (network module)
 #   ├─ OIDC issuer ──▶ federated credential ──▶ id-<prefix>-app  (the app's Azure identity)
 #   ├─ add-ons: Azure Policy (Gatekeeper/OPA) · Key Vault CSI · Container Insights (MSI auth)

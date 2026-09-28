@@ -1,0 +1,240 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1040" viewBox="0 0 1700 1040" font-family="'Segoe UI', -apple-system, Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Azure AI Foundry Secure Landing Zone - reference architecture</title>
+<desc id="d">GitHub Actions authenticates to Entra ID with OIDC; deploy identities manage the dev resource group; a private AKS cluster runs the app with a workload identity and reaches AI Foundry, Key Vault and ACR through Private Endpoints; all telemetry goes to one Log Analytics workspace.</desc>
+<defs>
+<marker id="m-ci" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0b5cad"/></marker>
+<marker id="m-run" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#107c10"/></marker>
+<marker id="m-tok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8661c5"/></marker>
+<marker id="m-tel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ca5010"/></marker>
+</defs>
+<rect x="0" y="0" width="1700" height="1040" fill="#ffffff"/>
+<text x="24" y="42" font-size="24" fill="#1b1f24" font-weight="700" text-anchor="start">Azure AI Foundry Secure Landing Zone</text>
+<text x="24" y="66" font-size="13.5" fill="#57606a" font-weight="normal" text-anchor="start">Reference architecture · dev environment (prod: same layout, 10.20.0.0/16, Standard tier, zones 1-3)</text>
+<rect x="900" y="30" width="121.6" height="24" rx="12" fill="#fdecea" stroke="#b3261e" stroke-width="1.2"/>
+<text x="960.8" y="46.5" font-size="12.5" fill="#b3261e" font-weight="700" text-anchor="middle">0 model API keys</text>
+<rect x="1031.6" y="30" width="171.29999999999998" height="24" rx="12" fill="#fdecea" stroke="#b3261e" stroke-width="1.2"/>
+<text x="1117.25" y="46.5" font-size="12.5" fill="#b3261e" font-weight="700" text-anchor="middle">0 public PaaS endpoints</text>
+<rect x="1212.8999999999999" y="30" width="135.8" height="24" rx="12" fill="#fdecea" stroke="#b3261e" stroke-width="1.2"/>
+<text x="1280.8" y="46.5" font-size="12.5" fill="#b3261e" font-weight="700" text-anchor="middle">0 pipeline secrets</text>
+<rect x="1358.6999999999998" y="30" width="157.1" height="24" rx="12" fill="#fff4ec" stroke="#ca5010" stroke-width="1.2"/>
+<text x="1437.2499999999998" y="46.5" font-size="12.5" fill="#ca5010" font-weight="700" text-anchor="middle">1 telemetry workspace</text>
+<rect x="20" y="90" width="290" height="610" rx="12" fill="#f6f8fa" stroke="#24292f" stroke-width="1.5"/>
+<text x="32" y="112" font-size="15" fill="#24292f" font-weight="700" text-anchor="start">GitHub</text>
+<text x="32" y="132" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">everydaysa/azure-ai-foundry-landing-zone</text>
+<rect x="34" y="150" width="262" height="42" rx="7" fill="#ffffff" stroke="#24292f" stroke-width="1.1"/>
+<text x="46" y="168" font-size="13" fill="#24292f" font-weight="700" text-anchor="start">ci.yml</text>
+<text x="46" y="184" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">every PR · no Azure access</text>
+<rect x="34" y="202" width="262" height="42" rx="7" fill="#ffffff" stroke="#24292f" stroke-width="1.1"/>
+<text x="46" y="220" font-size="13" fill="#24292f" font-weight="700" text-anchor="start">plan.yml</text>
+<text x="46" y="236" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">every PR · read-only plan + OPA</text>
+<rect x="34" y="254" width="262" height="42" rx="7" fill="#ffffff" stroke="#24292f" stroke-width="1.1"/>
+<text x="46" y="272" font-size="13" fill="#24292f" font-weight="700" text-anchor="start">deploy-dev.yml</text>
+<text x="46" y="288" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">merge to main · auto</text>
+<rect x="34" y="306" width="262" height="42" rx="7" fill="#ffffff" stroke="#24292f" stroke-width="1.1"/>
+<text x="46" y="324" font-size="13" fill="#24292f" font-weight="700" text-anchor="start">deploy-prod.yml</text>
+<text x="46" y="340" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">manual · reviewer · fingerprint</text>
+<rect x="34" y="358" width="262" height="42" rx="7" fill="#ffffff" stroke="#24292f" stroke-width="1.1"/>
+<text x="46" y="376" font-size="13" fill="#24292f" font-weight="700" text-anchor="start">drift.yml</text>
+<text x="46" y="392" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">nightly · live plan + OPA</text>
+<rect x="34" y="425" width="262" height="118" rx="8" fill="#ffffff" stroke="#24292f" stroke-width="1.5"/>
+<text x="44" y="444" font-size="13" fill="#24292f" font-weight="700" text-anchor="start">Guardrails</text>
+<text x="44" y="462" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Ruleset on main: PR only,</text>
+<text x="44" y="478" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">  7 required checks, no force-push</text>
+<text x="44" y="494" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Environments: main only;</text>
+<text x="44" y="510" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">  prod requires a reviewer</text>
+<text x="44" y="526" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Actions pinned to commit SHA</text>
+<rect x="34" y="555" width="262" height="130" rx="8" fill="#ffffff" stroke="#24292f" stroke-width="1.5"/>
+<text x="44" y="574" font-size="13" fill="#24292f" font-weight="700" text-anchor="start">Policy gates (shift left)</text>
+<text x="44" y="592" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Checkov: Terraform · Kubernetes ·</text>
+<text x="44" y="608" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">  Dockerfile · workflows</text>
+<text x="44" y="624" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">OPA on the Terraform PLAN JSON</text>
+<text x="44" y="640" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">OPA on RENDERED manifests</text>
+<text x="44" y="656" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">15 rules · 43 unit tests</text>
+<text x="44" y="672" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">gitleaks · actionlint · 38 module tests</text>
+<rect x="350" y="90" width="260" height="610" rx="12" fill="#eef6fc" stroke="#0063b1" stroke-width="1.5"/>
+<text x="362" y="112" font-size="15" fill="#0063b1" font-weight="700" text-anchor="start">Microsoft Entra ID</text>
+<rect x="362" y="125" width="236" height="88" rx="8" fill="#ffffff" stroke="#0063b1" stroke-width="1.5"/>
+<text x="372" y="144" font-size="13" fill="#0063b1" font-weight="700" text-anchor="start">Federated credentials</text>
+<text x="372" y="162" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">exact match on issuer + subject:</text>
+<text x="372" y="178" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">repo:owner@id/repo@id:&lt;context&gt;</text>
+<text x="372" y="194" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">system:serviceaccount:ai-app:…</text>
+<rect x="362" y="225" width="236" height="64" rx="8" fill="#ffffff" stroke="#0063b1" stroke-width="1.5"/>
+<text x="372" y="244" font-size="13" fill="#0063b1" font-weight="700" text-anchor="start">id-aifz-gh-plan</text>
+<text x="372" y="262" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Reader · AKS Cluster User</text>
+<text x="372" y="278" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">state lock · PRs + nightly drift</text>
+<rect x="362" y="300" width="236" height="80" rx="8" fill="#ffffff" stroke="#0063b1" stroke-width="1.5"/>
+<text x="372" y="319" font-size="13" fill="#0063b1" font-weight="700" text-anchor="start">id-aifz-gh-dev</text>
+<text x="372" y="337" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Contributor · AcrPush · AKS Admin</text>
+<text x="372" y="353" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">RBAC Admin limited by ABAC:</text>
+<text x="372" y="369" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">7 roles, to service principals only</text>
+<rect x="362" y="391" width="236" height="64" rx="8" fill="#ffffff" stroke="#0063b1" stroke-width="1.5"/>
+<text x="372" y="410" font-size="13" fill="#0063b1" font-weight="700" text-anchor="start">id-aifz-gh-prod</text>
+<text x="372" y="428" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">same rights, prod RG only</text>
+<text x="372" y="444" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">runs only after reviewer approval</text>
+<rect x="362" y="470" width="236" height="96" rx="8" fill="#ffffff" stroke="#8661c5" stroke-width="1.5"/>
+<text x="372" y="489" font-size="13" fill="#8661c5" font-weight="700" text-anchor="start">id-aifz-dev-app</text>
+<text x="372" y="507" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">workload identity of the app pod</text>
+<text x="372" y="523" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Cognitive Services OpenAI User</text>
+<text x="372" y="539" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Key Vault Secrets User</text>
+<text x="372" y="555" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Monitoring Metrics Publisher</text>
+<text x="480" y="600" font-size="12" fill="#0063b1" font-weight="600" text-anchor="middle">Every credential is a short-lived</text>
+<text x="480" y="617" font-size="12" fill="#0063b1" font-weight="600" text-anchor="middle">token. Nothing to steal or rotate.</text>
+<text x="480" y="648" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="middle">Owner ≠ data plane: the subscription</text>
+<text x="480" y="664" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="middle">Owner gets PermissionDenied on</text>
+<text x="480" y="680" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="middle">the model. Only the app identity can call it.</text>
+<rect x="645" y="90" width="1035" height="900" rx="12" fill="#fbfdff" stroke="#0078d4" stroke-width="1.5"/>
+<text x="657" y="112" font-size="15" fill="#0078d4" font-weight="700" text-anchor="start">Azure subscription · East US 2</text>
+<rect x="662" y="122" width="300" height="108" rx="8" fill="#fcfaff" stroke="#5c2d91" stroke-width="1.5"/>
+<text x="672" y="141" font-size="13" fill="#5c2d91" font-weight="700" text-anchor="start">rg-aifz-bootstrap (one-time, Owner)</text>
+<text x="672" y="159" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Terraform state: Entra-only (keys off),</text>
+<text x="672" y="175" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">versioned, soft delete, delete lock</text>
+<text x="672" y="191" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">3 CI identities + federated credentials</text>
+<text x="672" y="207" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">created once by a human, then never again</text>
+<rect x="980" y="122" width="682" height="108" rx="8" fill="#fafbfc" stroke="#57606a" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="992" y="142" font-size="13" fill="#57606a" font-weight="700" text-anchor="start">rg-aifz-prod (defined + plan-verified on every PR, not kept running)</text>
+<text x="992" y="162" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">same modules and settings shape · 10.20.0.0/16 · AKS Standard tier (SLA) · zones 1-3</text>
+<text x="992" y="178" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">3-5 nodes · 30K tokens/min · 90-day logs, no cap · deploy: reviewer approves a plan fingerprint</text>
+<text x="992" y="194" font-size="11.5" fill="#b3261e" font-weight="600" text-anchor="start">OPA rule T7 blocks a prod plan that isn't Standard tier</text>
+<rect x="662" y="245" width="1000" height="732" rx="10" fill="#fcfaff" stroke="#5c2d91" stroke-width="1.5"/>
+<text x="674" y="267" font-size="15" fill="#5c2d91" font-weight="700" text-anchor="start">rg-aifz-dev</text>
+<text x="1650" y="267" font-size="12" fill="#57606a" font-weight="normal" text-anchor="end">47 resources · every one tagged project / environment / managed_by</text>
+<rect x="680" y="285" width="505" height="420" rx="10" fill="#f3faf3" stroke="#107c10" stroke-width="1.5"/>
+<text x="692" y="307" font-size="15" fill="#107c10" font-weight="700" text-anchor="start">VNet 10.10.0.0/16</text>
+<rect x="695" y="320" width="285" height="370" rx="8" fill="#ffffff" stroke="#107c10" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="705" y="338" font-size="12" fill="#107c10" font-weight="700" text-anchor="start">snet-aks-nodes 10.10.0.0/22</text>
+<text x="705" y="353" font-size="11" fill="#57606a" font-weight="normal" text-anchor="start">NSG: deny inbound from Internet</text>
+<rect x="705" y="362" width="265" height="64" rx="7" fill="#eef3fd" stroke="#326ce5" stroke-width="1.5"/>
+<text x="715" y="381" font-size="13" fill="#326ce5" font-weight="700" text-anchor="start">Private AKS cluster</text>
+<text x="715" y="398" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">API server private · local accounts off</text>
+<text x="715" y="414" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Entra ID + Azure RBAC · Azure Policy</text>
+<rect x="705" y="436" width="265" height="150" rx="7" fill="#ffffff" stroke="#326ce5" stroke-width="1.5"/>
+<text x="715" y="455" font-size="12.5" fill="#326ce5" font-weight="700" text-anchor="start">namespace ai-app  (PSA: restricted)</text>
+<rect x="715" y="464" width="245" height="60" rx="6" fill="#eef3fd" stroke="#326ce5" stroke-width="1"/>
+<text x="725" y="482" font-size="12.5" fill="#1b1f24" font-weight="700" text-anchor="start">aifz-app pods (FastAPI)</text>
+<text x="725" y="498" font-size="11" fill="#1b1f24" font-weight="normal" text-anchor="start">non-root · read-only FS · drop ALL</text>
+<text x="725" y="513" font-size="11" fill="#1b1f24" font-weight="normal" text-anchor="start">image pinned by @sha256 digest</text>
+<text x="715" y="541" font-size="11.5" fill="#8661c5" font-weight="600" text-anchor="start">ServiceAccount foundry-app</text>
+<text x="715" y="557" font-size="11.5" fill="#8661c5" font-weight="normal" text-anchor="start">→ workload identity (no key mounted)</text>
+<text x="715" y="575" font-size="11.5" fill="#b3261e" font-weight="600" text-anchor="start">NetworkPolicy: default-deny · IMDS blocked</text>
+<rect x="705" y="596" width="265" height="84" rx="7" fill="#ffffff" stroke="#326ce5" stroke-width="1.5"/>
+<text x="715" y="614" font-size="12.5" fill="#326ce5" font-weight="700" text-anchor="start">Node pool (autoscale 2-3)</text>
+<text x="715" y="630" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">AzureLinux · Standard_D2ds_v4</text>
+<text x="715" y="646" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">ephemeral OS · host encryption</text>
+<text x="715" y="662" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">Cilium overlay · no public IPs</text>
+<text x="715" y="675" font-size="10.5" fill="#57606a" font-weight="normal" text-anchor="start">kubelet identity: AcrPull</text>
+<rect x="1000" y="320" width="170" height="370" rx="8" fill="#ffffff" stroke="#107c10" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="1010" y="338" font-size="12" fill="#107c10" font-weight="700" text-anchor="start">snet-private-endpoints</text>
+<text x="1010" y="353" font-size="12" fill="#107c10" font-weight="700" text-anchor="start">10.10.4.0/24</text>
+<text x="1010" y="368" font-size="11" fill="#57606a" font-weight="normal" text-anchor="start">NSG: 443 from AKS only</text>
+<text x="1010" y="382" font-size="11" fill="#57606a" font-weight="normal" text-anchor="start">no outbound</text>
+<rect x="1012" y="392" width="146" height="50" rx="7" fill="#e3f4e3" stroke="#107c10" stroke-width="1.5"/>
+<text x="1085" y="413" font-size="12" fill="#107c10" font-weight="700" text-anchor="middle">PE · AI Foundry</text>
+<text x="1085" y="430" font-size="11" fill="#1b1f24" font-weight="normal" text-anchor="middle">private IP 10.10.4.x</text>
+<rect x="1012" y="467" width="146" height="50" rx="7" fill="#e3f4e3" stroke="#107c10" stroke-width="1.5"/>
+<text x="1085" y="488" font-size="12" fill="#107c10" font-weight="700" text-anchor="middle">PE · Key Vault</text>
+<text x="1085" y="505" font-size="11" fill="#1b1f24" font-weight="normal" text-anchor="middle">private IP 10.10.4.x</text>
+<rect x="1012" y="607" width="146" height="50" rx="7" fill="#e3f4e3" stroke="#107c10" stroke-width="1.5"/>
+<text x="1085" y="628" font-size="12" fill="#107c10" font-weight="700" text-anchor="middle">PE · Container Reg.</text>
+<text x="1085" y="645" font-size="11" fill="#1b1f24" font-weight="normal" text-anchor="middle">private IP 10.10.4.x</text>
+<rect x="1265" y="380" width="382" height="74" rx="8" fill="#f5f0fc" stroke="#8661c5" stroke-width="1.5"/>
+<text x="1275" y="399" font-size="13" fill="#8661c5" font-weight="700" text-anchor="start">Azure AI Foundry  ·  gpt-5.4-mini</text>
+<text x="1275" y="417" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">local auth OFF (keys can't authenticate)</text>
+<text x="1275" y="433" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">public network OFF · outbound restricted</text>
+<rect x="1265" y="460" width="382" height="64" rx="8" fill="#f5f0fc" stroke="#8661c5" stroke-width="1.5"/>
+<text x="1275" y="479" font-size="13" fill="#8661c5" font-weight="700" text-anchor="start">Key Vault</text>
+<text x="1275" y="497" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">RBAC only · purge protection · public OFF</text>
+<rect x="1265" y="598" width="382" height="68" rx="8" fill="#f5f0fc" stroke="#8661c5" stroke-width="1.5"/>
+<text x="1275" y="617" font-size="13" fill="#8661c5" font-weight="700" text-anchor="start">Container Registry (Premium)</text>
+<text x="1275" y="635" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">deny-by-default · admin + anonymous OFF</text>
+<text x="1275" y="651" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">CI push through a just-in-time IP rule</text>
+<rect x="1265" y="530" width="382" height="60" rx="8" fill="#f3faf3" stroke="#107c10" stroke-width="1.5"/>
+<text x="1275" y="549" font-size="13" fill="#107c10" font-weight="700" text-anchor="start">Private DNS · 5 privatelink zones</text>
+<text x="1275" y="567" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">linked to the VNet: names resolve to PE IPs</text>
+<rect x="815" y="722" width="170" height="76" rx="8" fill="#f3faf3" stroke="#107c10" stroke-width="1.5"/>
+<text x="825" y="741" font-size="13" fill="#107c10" font-weight="700" text-anchor="start">NAT Gateway</text>
+<text x="825" y="759" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">1 static egress IP</text>
+<text x="825" y="775" font-size="11.5" fill="#1b1f24" font-weight="normal" text-anchor="start">443 → Entra, Monitor</text>
+<text x="1000" y="748" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">Internet egress is 443 only,</text>
+<text x="1000" y="764" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">to public addresses (private</text>
+<text x="1000" y="780" font-size="11.5" fill="#57606a" font-weight="normal" text-anchor="start">ranges and IMDS excluded).</text>
+<rect x="680" y="840" width="967" height="125" rx="10" fill="#fff4ec" stroke="#ca5010" stroke-width="1.5"/>
+<text x="694" y="863" font-size="15" fill="#ca5010" font-weight="700" text-anchor="start">Log Analytics workspace log-aifz-dev  +  App Insights (workspace-based)</text>
+<text x="694" y="885" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Entra-only ingestion (local auth OFF): a leaked connection string can't write or forge telemetry · dev: 30 days, 1 GB/day cap</text>
+<text x="694" y="905" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">App: AppRequests · AppTraces (OpenTelemetry)   Cluster: ContainerLogV2 · KubeEvents · AKSAuditAdmin (every API write)</text>
+<text x="694" y="925" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Platform: AzureDiagnostics (Foundry, Key Vault) · ContainerRegistryLoginEvents / RepositoryEvents · AzureMetrics</text>
+<text x="694" y="948" font-size="12" fill="#ca5010" font-weight="600" text-anchor="start">One KQL query can put an app error, a pod event, an audit entry and a model call on the same timeline.</text>
+<path d="M296,280 H325 V170 H360" fill="none" stroke="#0b5cad" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#m-ci)" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="325" cy="225" r="11" fill="#0b5cad" stroke="#ffffff" stroke-width="2"/>
+<text x="325" y="229.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">1</text>
+<path d="M598,340 H630 V394 H703" fill="none" stroke="#0b5cad" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#m-ci)" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="630" cy="367" r="11" fill="#0b5cad" stroke="#ffffff" stroke-width="2"/>
+<text x="630" y="371.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">2</text>
+<path d="M598,257 H622 V176 H660" fill="none" stroke="#0b5cad" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#m-ci)" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="622" cy="216" r="11" fill="#0b5cad" stroke="#ffffff" stroke-width="2"/>
+<text x="622" y="220.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">3</text>
+<path d="M713,494 H600" fill="none" stroke="#8661c5" stroke-width="2.2" marker-end="url(#m-tok)" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="655" cy="494" r="11" fill="#8661c5" stroke="#ffffff" stroke-width="2"/>
+<text x="655" y="498.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">4</text>
+<rect x="612" y="507" width="74.0" height="18" rx="4" fill="#ffffff" opacity="0.92"/>
+<text x="617" y="520" font-size="11.5" fill="#8661c5" font-weight="600" text-anchor="start">token swap</text>
+<path d="M960,478 H986 V417 H1010" fill="none" stroke="#107c10" stroke-width="2.2" marker-end="url(#m-run)" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1158,417 H1263" fill="none" stroke="#107c10" stroke-width="2.2" marker-end="url(#m-run)" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1210" cy="417" r="11" fill="#107c10" stroke="#ffffff" stroke-width="2"/>
+<text x="1210" y="421.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">5</text>
+<rect x="1163" y="392" width="67.6" height="18" rx="4" fill="#ffffff" opacity="0.92"/>
+<text x="1168" y="405" font-size="11.5" fill="#107c10" font-weight="600" text-anchor="start">HTTPS 443</text>
+<path d="M960,500 H1010" fill="none" stroke="#107c10" stroke-width="2.2" marker-end="url(#m-run)" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1158,492 H1263" fill="none" stroke="#107c10" stroke-width="2.2" marker-end="url(#m-run)" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M970,632 H1010" fill="none" stroke="#107c10" stroke-width="2.2" marker-end="url(#m-run)" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1158,632 H1263" fill="none" stroke="#107c10" stroke-width="2.2" marker-end="url(#m-run)" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1210" cy="632" r="11" fill="#107c10" stroke="#ffffff" stroke-width="2"/>
+<text x="1210" y="636.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">6</text>
+<rect x="1163" y="607" width="67.6" height="18" rx="4" fill="#ffffff" opacity="0.92"/>
+<text x="1168" y="620" font-size="11.5" fill="#107c10" font-weight="600" text-anchor="start">by digest</text>
+<path d="M900,680 V720" fill="none" stroke="#107c10" stroke-width="2.2" marker-end="url(#m-run)" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="920" cy="700" r="11" fill="#107c10" stroke="#ffffff" stroke-width="2"/>
+<text x="920" y="704.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">7</text>
+<path d="M1263,560 H1180" fill="none" stroke="#107c10" stroke-width="1.6" stroke-dasharray="2 4" marker-end="url(#m-run)" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M730,680 V838" fill="none" stroke="#ca5010" stroke-width="2.4" stroke-dasharray="2 4" marker-end="url(#m-tel)" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="730" cy="760" r="11" fill="#ca5010" stroke="#ffffff" stroke-width="2"/>
+<text x="730" y="764.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">8</text>
+<path d="M1647,417 H1668 V902 H1649" fill="none" stroke="#ca5010" stroke-width="2.4" stroke-dasharray="2 4" marker-end="url(#m-tel)" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1647,492 H1668" fill="none" stroke="#ca5010" stroke-width="2.4" stroke-dasharray="2 4"/>
+<path d="M1647,632 H1668" fill="none" stroke="#ca5010" stroke-width="2.4" stroke-dasharray="2 4"/>
+<circle cx="1668" cy="760" r="11" fill="#ca5010" stroke="#ffffff" stroke-width="2"/>
+<text x="1668" y="764.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">8</text>
+<rect x="20" y="720" width="590" height="300" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="1.5"/>
+<text x="34" y="745" font-size="15" fill="#1b1f24" font-weight="700" text-anchor="start">How to read it</text>
+<path d="M36,768 H80" stroke="#0b5cad" stroke-width="2.4" stroke-dasharray="7 5"/>
+<text x="90" y="772" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Pipeline / control plane (ARM)</text>
+<path d="M36,790 H80" stroke="#8661c5" stroke-width="2.4"/>
+<text x="90" y="794" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Identity token exchange</text>
+<path d="M36,812 H80" stroke="#107c10" stroke-width="2.4"/>
+<text x="90" y="816" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Runtime data path (private)</text>
+<path d="M36,834 H80" stroke="#ca5010" stroke-width="2.4" stroke-dasharray="2 4"/>
+<text x="90" y="838" font-size="12" fill="#1b1f24" font-weight="normal" text-anchor="start">Telemetry and diagnostics</text>
+<circle cx="44" cy="864.0" r="11" fill="#0b5cad" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="868.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">1</text>
+<text x="62" y="868.0" font-size="11.8" fill="#1b1f24" font-weight="normal" text-anchor="start">GitHub job presents its OIDC token; Entra checks repo ID + context</text>
+<circle cx="44" cy="882.5" r="11" fill="#0b5cad" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="887.0" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">2</text>
+<text x="62" y="886.5" font-size="11.8" fill="#1b1f24" font-weight="normal" text-anchor="start">Deploy identity: plan → OPA → apply; JIT image push; kubectl via ARM</text>
+<circle cx="44" cy="901.0" r="11" fill="#0b5cad" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="905.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">3</text>
+<text x="62" y="905.0" font-size="11.8" fill="#1b1f24" font-weight="normal" text-anchor="start">Every Terraform run reads/locks state with an Entra token</text>
+<circle cx="44" cy="919.5" r="11" fill="#8661c5" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="924.0" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">4</text>
+<text x="62" y="923.5" font-size="11.8" fill="#1b1f24" font-weight="normal" text-anchor="start">Pod swaps its projected SA token for an Entra token (no secret)</text>
+<circle cx="44" cy="938.0" r="11" fill="#107c10" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="942.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">5</text>
+<text x="62" y="942.0" font-size="11.8" fill="#1b1f24" font-weight="normal" text-anchor="start">App → DNS → Private Endpoint → Foundry (keys disabled)</text>
+<circle cx="44" cy="956.5" r="11" fill="#107c10" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="961.0" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">6</text>
+<text x="62" y="960.5" font-size="11.8" fill="#1b1f24" font-weight="normal" text-anchor="start">Nodes pull the image by digest over the ACR Private Endpoint</text>
+<circle cx="44" cy="975.0" r="11" fill="#107c10" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="979.5" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">7</text>
+<text x="62" y="979.0" font-size="11.8" fill="#1b1f24" font-weight="normal" text-anchor="start">Only outbound: NAT, 443, to Entra ID and Azure Monitor</text>
+<circle cx="44" cy="993.5" r="11" fill="#ca5010" stroke="#ffffff" stroke-width="2"/>
+<text x="44" y="998.0" font-size="12.5" fill="#ffffff" font-weight="700" text-anchor="middle">8</text>
+<text x="62" y="997.5" font-size="11.8" fill="#1b1f24" font-weight="normal" text-anchor="start">App, cluster, audit, Foundry, KV, ACR → one workspace</text>
+</svg>

@@ -1,0 +1,166 @@
+# Observability
+
+**One Log Analytics workspace per environment receives everything:** application traces, container logs, Kubernetes audit, model request logs, vault access and registry events. One query language (KQL) answers any question across all of them.
+
+Think of it as a security control room: every camera in the building feeds the same wall of screens, so you can follow one person from the front door to the vault without switching rooms.
+
+## 1. What flows in
+
+```
+ source                        how it gets there                          lands in (tables)
+ ─────────────────────────────  ────────────────────────────────────────  ─────────────────────────────────────
+ aifz-app (FastAPI)            OpenTelemetry distro → App Insights         AppRequests · AppTraces · AppExceptions
+                               authenticated with the WORKLOAD IDENTITY    AppDependencies · AppMetrics
+ containers / pods / nodes     Container Insights (DCR, managed identity)  ContainerLogV2 · KubePodInventory
+                                                                           KubeEvents · KubeNodeInventory · InsightsMetrics
+ AKS control plane             diagnostic setting (resource-specific)      AKSAuditAdmin (every API write)
+                                                                           AKSControlPlane (guard, autoscaler)
+ AI Foundry                    diagnostic setting (allLogs + metrics)      AzureDiagnostics · AzureMetrics
+ Key Vault                     diagnostic setting (allLogs + metrics)      AzureDiagnostics · AzureMetrics
+ Container Registry            diagnostic setting (allLogs + metrics)      ContainerRegistryLoginEvents
+                                                                           ContainerRegistryRepositoryEvents
+```
+
+Code: `infra/modules/monitoring` (workspace + App Insights), plus a `diag-to-central-workspace` diagnostic setting in every other module and the DCR in `infra/modules/aks`. The app side is `app/src/app/telemetry.py`.
+
+## 2. Design choices
+
+| Choice | Why |
+|---|---|
+| **One workspace**, workspace-based App Insights | A single query correlates app, cluster, platform and model; one place for RBAC and retention |
+| **Local auth disabled** on Log Analytics *and* App Insights | The connection string only says *where* to send data. Writing requires an Entra token plus the **Monitoring Metrics Publisher** role, so a leaked string can't inject or forge telemetry. Checkov has no check for this, so **OPA rule T2** enforces it |
+| **Container Insights via DCR with managed identity auth** | No workspace key on the nodes |
+| `kube-audit-admin` (not full `kube-audit`) | Captures every write to the API server (who changed what) without the volume of every read |
+| Probes excluded from traces | `/healthz` and `/readyz` fire every few seconds; tracing them would be noise and cost |
+| Only the `app` logger is exported | Library debug chatter stays out of the workspace |
+| Resource-context access | A team with access to a resource can read *that resource's* logs without being granted the whole workspace |
+| Dev: 30 days, 1 GB/day cap · Prod: 90 days, no cap | Dev can't run up a bill; prod never drops security evidence |
+
+## 3. Ready-to-run KQL
+
+Open the workspace **log-aifz-dev** → *Logs* in the Azure portal, or use the CLI (section 4).
+
+### Application
+
+```kusto
+// /chat latency and error rate, 5-minute buckets
+AppRequests
+| where TimeGenerated > ago(24h) and Name has "/chat"
+| summarize requests = count(), failed = countif(Success == false),
+            p50_ms = percentile(DurationMs, 50), p95_ms = percentile(DurationMs, 95)
+  by bin(TimeGenerated, 5m)
+| order by TimeGenerated desc
+```
+
+```kusto
+// Token usage reported by the app (from the "chat ok" log line)
+AppTraces
+| where TimeGenerated > ago(24h) and Message startswith "chat ok"
+| extend prompt = toint(extract(@"prompt_tokens=(\d+)", 1, Message)),
+         completion = toint(extract(@"completion_tokens=(\d+)", 1, Message))
+| summarize calls = count(), prompt_tokens = sum(prompt), completion_tokens = sum(completion)
+```
+
+```kusto
+// Every error the app logged, newest first (identity, RBAC, network or model failures)
+AppTraces
+| where TimeGenerated > ago(7d) and SeverityLevel >= 3
+| project TimeGenerated, AppRoleName, Message
+| order by TimeGenerated desc
+```
+
+### Cluster
+
+```kusto
+// Container logs for the app, including anything printed before telemetry started
+ContainerLogV2
+| where TimeGenerated > ago(1h) and PodNamespace == "ai-app"
+| project TimeGenerated, PodName, ContainerName, LogMessage
+| order by TimeGenerated desc
+```
+
+```kusto
+// Pod restarts and warning events (crash loops, image pull failures, policy rejections)
+KubeEvents
+| where TimeGenerated > ago(24h) and Namespace == "ai-app" and KubeEventType == "Warning"
+| project TimeGenerated, Name, Reason, Message
+| order by TimeGenerated desc
+```
+
+### Security and audit
+
+```kusto
+// WHO changed WHAT in Kubernetes: every write to the API server
+AKSAuditAdmin
+| where TimeGenerated > ago(7d)
+| where Verb in ("create", "update", "patch", "delete")
+| extend user = tostring(User.username), resource = tostring(ObjectRef.resource),
+         ns = tostring(ObjectRef.namespace), name = tostring(ObjectRef.name)
+| where user !startswith "system:"            // hide Kubernetes' own controllers
+| project TimeGenerated, user, Verb, resource, ns, name
+| order by TimeGenerated desc
+```
+
+```kusto
+// Who accessed the model's control and data plane
+AzureDiagnostics
+| where TimeGenerated > ago(24h) and ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| summarize calls = count() by Category, OperationName, ResultSignature, CallerIPAddress
+| order by calls desc
+```
+
+```kusto
+// Key Vault access (expect only the app identity and the platform)
+AzureDiagnostics
+| where TimeGenerated > ago(7d) and ResourceProvider == "MICROSOFT.KEYVAULT"
+| summarize count() by OperationName, ResultSignature, CallerIPAddress
+```
+
+```kusto
+// Registry: every login and every push (pushes should come only from the deploy job)
+union ContainerRegistryLoginEvents, ContainerRegistryRepositoryEvents
+| where TimeGenerated > ago(7d)
+| project TimeGenerated, Type, OperationName, Identity, CallerIpAddress, Repository, Tag
+| order by TimeGenerated desc
+```
+
+### One incident timeline (correlate everything)
+
+```kusto
+// Everything that happened around a failure, from every source, on one timeline
+let t0 = ago(2h); let t1 = now();
+union
+  (AppRequests    | where TimeGenerated between (t0 .. t1) and Success == false
+                  | project TimeGenerated, source = "app-request", detail = strcat(Name, " → ", ResultCode)),
+  (AppTraces      | where TimeGenerated between (t0 .. t1) and SeverityLevel >= 3
+                  | project TimeGenerated, source = "app-log", detail = Message),
+  (KubeEvents     | where TimeGenerated between (t0 .. t1) and Namespace == "ai-app"
+                  | project TimeGenerated, source = "k8s-event", detail = strcat(Reason, ": ", Message)),
+  (AKSAuditAdmin  | where TimeGenerated between (t0 .. t1) and tostring(ObjectRef.namespace) == "ai-app"
+                  | project TimeGenerated, source = "k8s-audit",
+                            detail = strcat(tostring(User.username), " ", Verb, " ", tostring(ObjectRef.resource), "/", tostring(ObjectRef.name))),
+  (AzureDiagnostics | where TimeGenerated between (t0 .. t1) and ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+                    | project TimeGenerated, source = "foundry", detail = strcat(OperationName, " ", ResultSignature))
+| order by TimeGenerated asc
+```
+
+## 4. From the command line
+
+```bash
+WS=$(az monitor log-analytics workspace show -g rg-aifz-dev -n log-aifz-dev --query customerId -o tsv)
+az monitor log-analytics query -w "$WS" -o table --analytics-query '
+  AppRequests | where TimeGenerated > ago(1h) | summarize count() by Name, ResultCode'
+```
+
+Reading logs needs **Log Analytics Reader** (or higher) on the workspace or on the resource whose logs you want (resource-context access).
+
+## 5. Signals worth alerting on (production extension)
+
+| Alert | Query basis | Why |
+|---|---|---|
+| `/chat` 5xx rate > 5% for 10 min | `AppRequests` | Identity, network or model failure |
+| Any `model call denied` log | `AppTraces` | RBAC or private-network path broken |
+| Kubernetes write by a non-pipeline human identity in prod | `AKSAuditAdmin` | Change outside the pipeline |
+| Registry push not from the deploy identity | `ContainerRegistryRepositoryEvents` | Possible image tampering |
+| Drift issue opened | GitHub issue (`drift.yml`) | Azure changed outside Terraform |
+| Log ingestion hits the daily cap (dev) | `_LogOperation` | Data is being dropped |

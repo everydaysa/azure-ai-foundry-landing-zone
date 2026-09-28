@@ -10,6 +10,7 @@ import logging
 import os
 
 from azure.core.credentials import TokenCredential
+from fastapi import FastAPI
 
 from app.config import Settings
 
@@ -39,3 +40,17 @@ def configure_telemetry(settings: Settings, credential: TokenCredential) -> bool
     )
     log.info("telemetry enabled: exporting to Azure Monitor with Entra ID auth")
     return True
+
+
+def instrument_app(app: FastAPI) -> None:
+    """Trace every request to THIS app instance (-> AppRequests).
+
+    The distro instruments FastAPI by swapping in a patched `fastapi.FastAPI`
+    class. main.py imported the class before that swap happened, so without
+    this call the app is NOT traced: logs still arrive, requests silently don't.
+    Found by checking the docs against the live workspace (AppRequests was empty).
+    """
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+    FastAPIInstrumentor.instrument_app(app, excluded_urls="healthz,readyz")
+    log.info("request tracing enabled for this FastAPI app")

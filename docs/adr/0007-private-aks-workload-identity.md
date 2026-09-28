@@ -16,7 +16,7 @@ The application must call AI Foundry, Key Vault and App Insights without secrets
 | Workload → Azure | **Workload identity**: OIDC issuer + federated credential bound to one ServiceAccount | Secrets in Kubernetes, or pod-managed identity (deprecated) |
 | Control-plane identity | User-assigned, with Network Contributor on the VNet granted **before** creation | System-assigned (exists too late to be granted subnet access) |
 | Networking | Azure CNI Overlay + Cilium; egress via NAT Gateway | kubenet (retiring); load-balancer egress |
-| Nodes | AzureLinux, ephemeral OS, host encryption, 3 zones, 2–3 autoscaled D2ds_v5 in dev | Managed OS disks; single node |
+| Nodes | AzureLinux, ephemeral OS, host encryption, autoscaled; dev 2–3 × D2ds_v4 regional, prod 3–5 × D2ds_v4 in zones 1–3 (see Consequences) | Managed OS disks; single node |
 | Admission | Azure Policy add-on (Gatekeeper/OPA), which pairs with OPA checks in CI | None |
 | Logs | `kube-audit-admin` (writes only) + `guard` + autoscaler | `kube-audit` (all reads too): far more volume and cost |
 
