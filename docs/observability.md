@@ -35,24 +35,30 @@ Code: `infra/modules/monitoring` (workspace + App Insights), plus a `diag-to-cen
 | Probes excluded from traces | `/healthz` and `/readyz` fire every few seconds; tracing them would be noise and cost |
 | Only the `app` logger is exported | Library debug chatter stays out of the workspace |
 | Resource-context access | A team with access to a resource can read *that resource's* logs without being granted the whole workspace |
-| Dev: 30 days, 1 GB/day cap · Prod: 90 days, no cap | Dev can't run up a bill; prod never drops security evidence |
+| Dev: 30 days, 2 GB/day cap · Prod: 90 days, no cap | Dev can't run up a bill; the cap is sized from measured volume (§3) so normal days never trip it; prod never drops security evidence |
 
 ## 3. Measured volume and the daily cap
 
-The cap is a guardrail. When it trips, ingestion stops for the rest of the day, **security audit and app traces included**. So the design goal is that it never trips. Measured on idle dev (24 h, 2 nodes):
+The cap is a guardrail. When it trips, ingestion stops for the rest of the day, **security audit and app traces included**. So the design goal is that normal days never trip it. Measured on idle dev (2 nodes, hourly `Usage`, steady from the first hour):
 
-| Table | MB/day | Finding |
+| Table | MB/hour | Finding |
 |---|---|---|
-| AKSAuditAdmin | 322 | **82% of rows are `update leases`**: controllers renewing leader-election heartbeats every few seconds. No security value |
-| Perf | 154 | Not used by any query → no longer collected |
-| ContainerInventory | 94 | Not used → no longer collected |
-| InsightsMetrics | 37 | Not used → no longer collected |
-| KubePodInventory | 32 | Used; collected every 5 min instead of every 1 min |
-| **Total billable** | **750 of 1,024** | **73% of the cap while idle** |
+| AKSAuditAdmin | ~40 | **82% of rows are `update leases`**: controllers renewing leader-election heartbeats every few seconds. No security value |
+| Perf | ~20 | Not used by any query → no longer collected |
+| ContainerInventory | ~12 | Not used → no longer collected |
+| InsightsMetrics | ~5 | Not used → no longer collected |
+| KubePodInventory | ~3.5 | Used; now collected every 5 min instead of every 1 min |
+| **Total billable** | **~84** | **~2 GB/day: the original 1 GB cap would have tripped about 12 hours into every day** |
 
-After trimming Container Insights, the expected total is about **465 MB/day** (~45% of the cap).
+| Configuration | MB/hour | Per day | Result |
+|---|---|---|---|
+| Default Container Insights | ~84 | ~2.0 GB | Over a 1 GB cap |
+| **Trimmed streams, every 5 min (current)** | **~44** | **~1.05 GB** | **Dev cap raised to 2 GB/day: ~2× headroom, still stops a runaway bug** |
+| + lease-heartbeat filter (extension) | ~11 | ~0.26 GB | The cap could go back to 1 GB |
 
-**Production extension: filter lease heartbeats at ingestion (~265 MB/day more).** A workspace transformation on `AKSAuditAdmin` can drop only the lease renewals and keep every other write. It isn't automated here on purpose. The workspace must reference the transformation rule, and the rule must reference the workspace, which azurerm can't express in one apply (the provider's own acceptance test uses two passes). The options are an `azapi_update_resource` patch after both exist, or a documented two-pass deploy. For this project, the measured numbers and the exact rule are the deliverable:
+A lesson from getting this wrong first: a "last 24 hours" total from an environment that is only 9 hours old reads as a low daily rate. **Measure per hour, from the first full hour, before sizing a cap.**
+
+**Production extension: filter lease heartbeats at ingestion (about −33 MB/hour).** A workspace transformation on `AKSAuditAdmin` can drop only the lease renewals and keep every other write. It isn't automated here on purpose. The workspace must reference the transformation rule, and the rule must reference the workspace, which azurerm can't express in one apply (the provider's own acceptance test uses two passes). The options are an `azapi_update_resource` patch after both exist, or a documented two-pass deploy. For this project, the measured numbers and the exact rule are the deliverable:
 
 ```kusto
 // Workspace transformation for AKSAuditAdmin (drops only lease renewals; every other write is kept)
@@ -60,9 +66,10 @@ source | where not(Verb == "update" and tostring(ObjectRef.resource) == "leases"
 ```
 
 ```kusto
-// Re-measure: billable MB per table, last 24 h
-Usage | where TimeGenerated > ago(1d) and IsBillable
-| summarize MB = round(sum(Quantity), 1) by DataType | order by MB desc
+// Re-measure: billable MB per hour and table (size caps from this, not from a 24 h total)
+Usage | where TimeGenerated > ago(24h) and IsBillable
+| summarize MB = round(sum(Quantity), 1) by bin(TimeGenerated, 1h), DataType
+| order by TimeGenerated desc, MB desc
 ```
 
 ## 4. Ready-to-run KQL

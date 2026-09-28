@@ -213,7 +213,7 @@ text(1000, 780, "ranges and IMDS excluded).", 11.5, C["sub"])
 # Observability
 box(680, 840, 967, 125, C["obs"], C["obsbg"], rx=10)
 text(694, 863, "Log Analytics workspace log-aifz-dev  +  App Insights (workspace-based)", 15, C["obs"], "700")
-text(694, 885, "Entra-only ingestion (local auth OFF): a leaked connection string can't write or forge telemetry · dev: 30 days, 1 GB/day cap", 12, C["ink"])
+text(694, 885, "Entra-only ingestion (local auth OFF): a leaked connection string can't write or forge telemetry · dev: 30 days, 2 GB/day cap", 12, C["ink"])
 text(694, 905, "App: AppRequests · AppTraces (OpenTelemetry)   Cluster: ContainerLogV2 · KubeEvents · AKSAuditAdmin (every API write)", 12, C["ink"])
 text(694, 925, "Platform: AzureDiagnostics (Foundry, Key Vault) · ContainerRegistryLoginEvents / RepositoryEvents · AzureMetrics", 12, C["ink"])
 text(694, 948, "One KQL query can put an app error, a pod event, an audit entry and a model call on the same timeline.", 12, C["obs"], "600")
