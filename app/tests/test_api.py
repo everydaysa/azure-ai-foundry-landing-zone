@@ -187,3 +187,19 @@ def test_telemetry_is_off_without_connection_string(settings):
     from app.telemetry import configure_telemetry
 
     assert configure_telemetry(settings, FakeCredential()) is False
+
+
+def test_requests_are_traced_when_telemetry_is_on(settings, monkeypatch):
+    # Regression: the distro's global FastAPI patch missed our early-imported
+    # class, so AppRequests stayed empty in production. The app must be
+    # instrumented explicitly.
+    import app.main as main
+
+    monkeypatch.setattr(main, "configure_telemetry", lambda *_: True)
+    app = create_app(settings, FakeCredential(), FakeChat())
+    assert getattr(app, "_is_instrumented_by_opentelemetry", False)
+
+
+def test_requests_are_not_traced_when_telemetry_is_off(settings):
+    app = create_app(settings, FakeCredential(), FakeChat())
+    assert not getattr(app, "_is_instrumented_by_opentelemetry", False)

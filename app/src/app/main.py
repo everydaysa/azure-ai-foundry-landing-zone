@@ -19,7 +19,7 @@ from app import __version__
 from app.config import Settings, get_settings
 from app.foundry import ChatResult, FoundryChat
 from app.identity import build_credential, describe_identity
-from app.telemetry import configure_telemetry
+from app.telemetry import configure_telemetry, instrument_app
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("app")
@@ -50,12 +50,12 @@ def create_app(
     settings = settings or get_settings()
     credential = credential or build_credential()
 
-    configure_telemetry(settings, credential)
+    telemetry_on = configure_telemetry(settings, credential)
     backend = chat_backend or FoundryChat(settings, credential)
 
-    # configure_telemetry() ran first, so the Azure Monitor distro has already
-    # auto-instrumented FastAPI: every request below becomes a trace.
     app = FastAPI(title="aifz-app", version=__version__, docs_url=None, redoc_url=None)
+    if telemetry_on:
+        instrument_app(app)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

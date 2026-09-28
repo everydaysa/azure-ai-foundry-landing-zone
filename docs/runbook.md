@@ -193,5 +193,6 @@ Key Vault names stay reserved during the soft-delete window (purge protection is
 | Checkov CKV_K8S_43 / OPA K1 on the smoke-test Job | Image referenced by tag | Pin by digest: `docker buildx imagetools inspect <image:tag>` |
 | gitleaks `generic-api-key` on `rbac.rego` | Built-in role GUIDs look like keys | Line-level `# gitleaks:allow` with a reason (public IDs, same in every tenant) |
 | Deploy hangs at "waiting for registry" | JIT IP rule not yet effective | The script retries for 150 s; if your egress IP changes mid-run (VPN), re-run |
+| `AppTraces` has rows but `AppRequests` is empty | The distro patches the `fastapi.FastAPI` class, but `main.py` imported it before the patch, so the app instance was never instrumented | Instrument the instance explicitly: `FastAPIInstrumentor.instrument_app(app)` (`app/src/app/telemetry.py`), covered by a regression test |
 | `make: No rule to make target` | Not run from the repo root | `cd` to the repository root |
 | `Error acquiring the state lock` | Another plan/apply holds the lease | Wait (CI uses `-lock-timeout`), or `terraform force-unlock <ID>` only if the holder is dead |

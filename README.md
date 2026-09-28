@@ -77,7 +77,7 @@ infra/
                       (each with README + offline `terraform test`)
   stack/              composes the 7 modules; the only place they meet
   envs/dev|prod/      settings + state key only (no logic)
-app/                  FastAPI service: workload identity, OpenAI v1 SDK, OpenTelemetry, 14 tests
+app/                  FastAPI service: workload identity, OpenAI v1 SDK, OpenTelemetry, 16 tests
 k8s/                  Kustomize base + overlays: PSA restricted, default-deny NetworkPolicies
 policy/               Checkov config + OPA rules (Terraform plan + Kubernetes) with tests
 scripts/              deploy-app · smoke-test · opa-eval · plan-fingerprint · github-settings
