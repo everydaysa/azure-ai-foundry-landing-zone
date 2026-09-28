@@ -1,0 +1,115 @@
+# ─── 5/5  Drift + continuous compliance: nightly, read-only ───────────────
+#
+# Terraform plan against the LIVE environment with the read-only plan identity:
+#   exit 0 = Azure matches the code          exit 2 = something changed outside Terraform
+# Then OPA runs on that plan. Because the plan contains EVERY resource (changed
+# or not), this re-checks the whole live environment against policy each night.
+# Result: one GitHub issue per environment, opened on drift/violation and
+# closed automatically when things are clean again.
+name: drift
+
+on:
+  schedule:
+    - cron: "23 6 * * *" # daily 06:23 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  drift:
+    name: drift (${{ matrix.env }})
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write # subject "ref:refs/heads/main" ─▶ read-only plan identity
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev] # add prod once it is deployed
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - name: Mask deployment identifiers in logs (public repo)
+        run: |
+          echo "::add-mask::${ARM_SUBSCRIPTION_ID}"
+          echo "::add-mask::${ARM_TENANT_ID}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.16.0"
+          terraform_wrapper: false
+      - uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: "1.21.0"
+
+      - name: Detect drift
+        id: drift
+        run: |
+          make init ENV=${{ matrix.env }}
+          set +e
+          # -lock=false: read-only check, never blocks a real deploy
+          terraform -chdir=infra/envs/${{ matrix.env }} plan -input=false -lock=false \
+            -detailed-exitcode -out=tfplan -no-color > plan.txt 2>&1
+          code=$?
+          set -e
+          cat plan.txt
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          [ "$code" -ne 1 ] # 1 = the plan itself failed
+
+      - name: Policy on the live environment
+        id: policy
+        run: |
+          set +e
+          make policy-plan ENV=${{ matrix.env }} 2>&1 | tee policy.txt
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Open, update or close the drift issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ENV_NAME: ${{ matrix.env }}
+          DRIFT_CODE: ${{ steps.drift.outputs.code }}
+          POLICY_EXIT: ${{ steps.policy.outputs.exit }}
+        with:
+          script: |
+            const fs = require('fs');
+            const scrub = (s) => [process.env.ARM_SUBSCRIPTION_ID, process.env.ARM_TENANT_ID]
+              .filter(Boolean).reduce((t, id) => t.split(id).join('***'), s);
+            const env = process.env.ENV_NAME;
+            const drift = process.env.DRIFT_CODE === '2';
+            const violations = process.env.POLICY_EXIT !== '0';
+            const marker = `<!-- aifz-drift-${env} -->`;
+            const { owner, repo } = context.repo;
+            const open = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open' }))
+              .find(i => !i.pull_request && (i.body || '').includes(marker));
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+
+            if (!drift && !violations) {
+              if (open) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: open.number, body: `✅ Clean again - ${runUrl}` });
+                await github.rest.issues.update({ owner, repo, issue_number: open.number, state: 'closed' });
+              }
+              core.info(`${env}: no drift, no violations`);
+              return;
+            }
+            const plan = scrub(fs.readFileSync('plan.txt', 'utf8'));
+            const summary = (plan.match(/^(Plan:.*)$/m) || [''])[0];
+            const body = [
+              marker,
+              `**Environment:** \`${env}\` · **Run:** ${runUrl}`,
+              `- Drift: ${drift ? '⚠️ yes - ' + summary : 'none'}`,
+              `- Policy: ${violations ? '❌ violations' : '✅ compliant'}`,
+              '```', scrub(fs.readFileSync('policy.txt', 'utf8')).trim(), '```',
+              '<details><summary>Plan</summary>', '', '```hcl', plan.slice(0, 55000), '```', '</details>',
+              '', 'Fix: revert the manual change in Azure, or codify it in Terraform and merge.',
+            ].join('\n');
+            if (open) await github.rest.issues.update({ owner, repo, issue_number: open.number, body });
+            else await github.rest.issues.create({ owner, repo, title: `Drift detected: ${env}`, body });
+            core.setFailed(`${env}: drift=${drift} violations=${violations}`);

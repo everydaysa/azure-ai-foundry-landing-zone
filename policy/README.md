@@ -4,7 +4,7 @@ Two engines, three layers, one rule: **if a control matters, a machine checks it
 
 ```
             ┌───────────── what is checked ─────────────┐
- change ──▶ │ 1. Checkov   the CODE     .tf · k8s YAML · Dockerfile   (1,000+ built-in checks)
+ change ──▶ │ 1. Checkov   the CODE     .tf · k8s · Dockerfile · workflows  (1,000+ built-in checks)
             │ 2. OPA       the PLAN     terraform show -json tfplan  (OUR rules, resolved values)
             │ 3. OPA       the RENDER   kubectl kustomize output     (OUR rules, final manifests)
             └───────────────────────────────────────────┘
@@ -60,7 +60,7 @@ T9 guards T7: removing the `environment` tag to dodge the prod rule fails the ta
 ## Run it
 
 ```bash
-make checkov                 # Checkov: Terraform + Kubernetes + Dockerfile
+make checkov                 # Checkov: Terraform + Kubernetes + Dockerfile + workflows
 make opa-test                # prove every rule: compliant input passes, violation is denied
 make policy-k8s ENV=dev      # OPA on the rendered manifests (base if no generated values)
 make plan ENV=dev && make policy-plan ENV=dev    # OPA on the real plan (needs az login)

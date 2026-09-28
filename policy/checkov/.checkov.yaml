@@ -4,6 +4,7 @@ framework:
   - terraform
   - kubernetes
   - dockerfile
+  - github_actions
 compact: true
 quiet: true
 skip-path:

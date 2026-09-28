@@ -1,0 +1,113 @@
+# ─── 1/5  CI: every check, on every pull request and every push to main ───
+# No cloud access at all: no Azure login, no OIDC token, read-only GITHUB_TOKEN.
+# The jobs call the same `make` targets you run locally.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TERRAFORM_VERSION: "1.16.0"
+  TFLINT_VERSION: "v0.64.0"
+  CHECKOV_VERSION: "3.3.10"
+  OPA_VERSION: "1.21.0"
+  GITLEAKS_VERSION: "v8.30.1"
+  ACTIONLINT_VERSION: "1.7.12"
+
+jobs:
+  terraform:
+    name: terraform # fmt · validate · test · tflint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+      - uses: terraform-linters/setup-tflint@1cf010d3c7aef302051ccdb68c14c5dc2efa34ef # v6.3.1
+        with:
+          tflint_version: ${{ env.TFLINT_VERSION }}
+      - run: make fmt-check
+      - run: make validate
+      - run: make test
+      - run: make lint
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # avoids rate limits when tflint downloads the azurerm ruleset
+
+  policy:
+    name: policy # checkov · opa test · OPA on rendered manifests
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: ${{ env.OPA_VERSION }}
+      - uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+      - run: pip install --no-cache-dir "checkov==${CHECKOV_VERSION}"
+      # checkov + opa test + OPA on the rendered manifests (base overlay: CI has no deploy values)
+      - run: make policy
+
+  app:
+    name: app # ruff · pytest · image build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: app/requirements-dev.txt
+      - run: pip install -r app/requirements-dev.txt
+      - run: make app-test
+      - run: make docker-build TAG=${{ github.sha }}
+
+  secrets:
+    name: secrets # gitleaks over the full git history
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan every commit, not just the tip
+          persist-credentials: false
+      - name: gitleaks
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo \
+            "ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION}" git --redact --verbose .
+
+  workflows:
+    name: workflows # actionlint: syntax, expressions, shellcheck inside run blocks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo "rhysd/actionlint:${ACTIONLINT_VERSION}" -color

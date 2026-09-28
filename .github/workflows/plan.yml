@@ -1,0 +1,111 @@
+# ─── 2/5  Plan: what WOULD change, posted on the pull request ─────────────
+#
+#   pull_request ──OIDC──▶ Entra ID ──▶ id-aifz-gh-plan   (Reader + state lock)
+#                  subject "repo:<owner>/<repo>:pull_request"
+#
+# The plan identity can read but never change Azure, so even a malicious PR
+# can't use this job to modify anything. PRs from forks get no OIDC token at
+# all (GitHub's rule), so the job is skipped for them.
+name: plan
+
+on:
+  pull_request: # every PR (no path filter) so "plan (dev)" / "plan (prod)" can be required checks
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: plan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: plan (${{ matrix.env }})
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write # request the GitHub OIDC token (the ONLY credential)
+      pull-requests: write # post the plan summary
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+      TF_IN_AUTOMATION: "true"
+      TF_CLI_ARGS_plan: "-lock-timeout=5m"
+    steps:
+      - name: Mask deployment identifiers in logs (public repo)
+        run: |
+          echo "::add-mask::${ARM_SUBSCRIPTION_ID}"
+          echo "::add-mask::${ARM_TENANT_ID}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.16.0"
+          terraform_wrapper: false
+      - uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: "1.21.0"
+
+      - name: terraform plan
+        id: plan
+        run: |
+          make plan ENV=${{ matrix.env }}
+          terraform -chdir=infra/envs/${{ matrix.env }} show -no-color tfplan > plan.txt
+
+      - name: OPA policy on the plan
+        id: policy
+        run: |
+          set +e
+          make policy-plan ENV=${{ matrix.env }} 2>&1 | tee policy.txt
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Post plan summary on the PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ENV_NAME: ${{ matrix.env }}
+          POLICY_EXIT: ${{ steps.policy.outputs.exit }}
+        with:
+          script: |
+            const fs = require('fs');
+            // Never publish subscription/tenant IDs in a public PR.
+            const scrub = (s) => [process.env.ARM_SUBSCRIPTION_ID, process.env.ARM_TENANT_ID]
+              .filter(Boolean).reduce((t, id) => t.split(id).join('***'), s);
+            const plan = scrub(fs.readFileSync('plan.txt', 'utf8'));
+            const policy = scrub(fs.readFileSync('policy.txt', 'utf8'));
+            const summary = (plan.match(/^(Plan:.*|No changes\..*)$/m) || ['(see job log)'])[0];
+            const ok = process.env.POLICY_EXIT === '0';
+            const marker = `<!-- aifz-plan-${process.env.ENV_NAME} -->`;
+            const max = 55000;
+            const body = [
+              marker,
+              `### Terraform plan · \`${process.env.ENV_NAME}\``,
+              `**${summary}**`,
+              `**OPA policy:** ${ok ? '✅ no violations' : '❌ violations - merge is blocked'}`,
+              '```', policy.trim(), '```',
+              '<details><summary>Full plan</summary>', '', '```hcl',
+              plan.length > max ? plan.slice(0, max) + '\n… truncated, see the job log' : plan,
+              '```', '</details>',
+              `<sub>${context.sha.slice(0, 7)} · run ${context.runId}</sub>`,
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const mine = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+            if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+      - name: Block on policy violations
+        if: steps.policy.outputs.exit != '0'
+        run: |
+          echo "::error::OPA denied the ${{ matrix.env }} plan - see the step above."
+          exit 1
