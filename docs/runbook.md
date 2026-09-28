@@ -175,8 +175,15 @@ gh workflow disable drift.yml
 # 2. Destroy the environment (asks you to type the env name)
 make destroy ENV=dev
 
-# 3. Confirm nothing billable remains
-az resource list -g rg-aifz-dev -o table
+# 3. Remove the two resources Azure generated on its own (free, but not Terraform-managed)
+# Azure auto-creates a "Failure Anomalies" alert rule + "Smart Detection" action group with
+# every App Insights resource. Terraform never created them, so it doesn't delete them:
+# (names contain spaces, so delete one quoted ID per line)
+az resource list -g rg-aifz-dev --query "[?type=='microsoft.alertsmanagement/smartDetectorAlertRules' || type=='microsoft.insights/actiongroups'].id" -o tsv \
+  | while IFS= read -r id; do az resource delete --ids "$id" && echo "deleted: ${id##*/}"; done
+
+# 4. Confirm nothing remains
+az resource list -g rg-aifz-dev -o table                 # expect: empty
 az cognitiveservices account list-deleted -o table     # purged on destroy (provider setting)
 ```
 
