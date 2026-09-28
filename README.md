@@ -7,7 +7,7 @@
 
 A production-grade, security-first foundation for running AI workloads on Azure, deployable end to end from this repository.
 
-> **Zero model API keys. Zero public PaaS endpoints. Zero pipeline secrets. One place for all telemetry.**
+> **Model API keys disabled. Zero public PaaS endpoints. Zero pipeline secrets. One place for all telemetry.**
 
 `Terraform (7 modules, dev/prod)` · `Azure AI Foundry` · `AKS` · `FastAPI` · `OpenTelemetry` · `Checkov` · `OPA` · `GitHub Actions`
 
@@ -17,7 +17,7 @@ A production-grade, security-first foundation for running AI workloads on Azure,
 
 An AKS-hosted FastAPI service calls a **gpt-5.4-mini** deployment in **Azure AI Foundry**:
 
-- **without any API key:** Foundry local auth is disabled; the app uses **AKS workload identity**.
+- **without an API key:** Foundry local auth is disabled, so even its platform-generated keys can't authenticate; the app uses **AKS workload identity**.
 - **without any public endpoint:** Foundry, Key Vault and ACR are reached through **Private Endpoints + Private DNS**; the AKS API server is private.
 - **deployed by a pipeline that holds no secrets:** GitHub Actions logs in with **OIDC**, a PR can only *read* Azure, and every deploy passes **Checkov + OPA** gates.
 - **observed in one place:** app, cluster, audit, model, vault and registry signals all land in **one Log Analytics workspace** that accepts only Entra-authenticated writes.

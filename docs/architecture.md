@@ -149,7 +149,7 @@ The bootstrap is the only step that runs with Owner rights, and it runs **once**
 
 ## 3. Identity: every principal and what it can do
 
-There are **no passwords, keys or client secrets anywhere** in this design. Every principal authenticates with a federated token or a managed identity.
+**No password, key or client secret is used anywhere** in this design. Every principal authenticates with a federated token or a managed identity. Azure still *generates* keys for Foundry, Storage and Log Analytics, but local auth is disabled on each, so those keys are inert. See [security.md](security.md) for why that distinction matters.
 
 ```mermaid
 flowchart LR

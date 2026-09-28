@@ -23,7 +23,7 @@ policy/
 └── opa/
     ├── terraform/                 package terraform   (input: plan JSON)
     │   ├── lib.rego               resources-after-apply, tag helpers
-    │   ├── identity.rego          zero keys: Foundry, Log Analytics, App Insights, ACR
+    │   ├── identity.rego          keys can't authenticate: Foundry, Log Analytics, App Insights, ACR
     │   ├── network.rego           no public access: Foundry, Key Vault; Foundry egress restricted
     │   ├── aks.rego               private, no local accounts, workload identity, policy add-on; PROD = Standard tier
     │   ├── rbac.rego              never Owner / User Access Administrator / RBAC Administrator
