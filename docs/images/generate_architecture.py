@@ -72,9 +72,9 @@ a(f'<rect x="0" y="0" width="{W}" height="{H}" fill="#ffffff"/>')
 # ─── Title ────────────────────────────────────────────────────────────────
 text(24, 42, "Azure AI Foundry Secure Landing Zone", 24, C["ink"], "700")
 text(24, 66, "Reference architecture · dev environment (prod: same layout, 10.20.0.0/16, Standard tier, zones 1-3)", 13.5, C["sub"])
-cx = 900
-for t in ("0 model API keys", "0 public PaaS endpoints", "0 pipeline secrets", "1 telemetry workspace"):
-    cx += chip(cx, 30, t, C["sec"] if t.startswith("0") else C["obs"], C["secbg"] if t.startswith("0") else C["obsbg"]) + 10
+cx = 860
+for t, red in (("model API keys disabled", True), ("0 public PaaS endpoints", True), ("0 pipeline secrets", True), ("1 telemetry workspace", False)):
+    cx += chip(cx, 30, t, C["sec"] if red else C["obs"], C["secbg"] if red else C["obsbg"]) + 10
 
 # ─── GitHub ───────────────────────────────────────────────────────────────
 box(20, 90, 290, 610, C["gh"], C["ghbg"], rx=12)
@@ -127,7 +127,7 @@ card(362, 470, 236, 96, "id-aifz-dev-app", [
     "Key Vault Secrets User",
     "Monitoring Metrics Publisher"], C["tok"], "#ffffff")
 text(480, 600, "Every credential is a short-lived", 12, C["entra"], "600", "middle")
-text(480, 617, "token. Nothing to steal or rotate.", 12, C["entra"], "600", "middle")
+text(480, 617, "token. No usable secret to steal.", 12, C["entra"], "600", "middle")
 text(480, 648, "Owner ≠ data plane: the subscription", 11.5, C["sub"], anchor="middle")
 text(480, 664, "Owner gets PermissionDenied on", 11.5, C["sub"], anchor="middle")
 text(480, 680, "the model. Only the app identity can call it.", 11.5, C["sub"], anchor="middle")

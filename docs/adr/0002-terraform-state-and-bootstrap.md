@@ -25,6 +25,6 @@ Remote state holds resource IDs and can hold sensitive values. It needs strong a
 
 ## Consequences
 
-- ✅ No storage keys exist to leak. State access requires an Entra token and is scoped per identity.
+- ✅ Storage keys are disabled (shared key access off), so they can't be used even if read. State access requires an Entra token and is scoped per identity.
 - ✅ Accidental deletion or corruption is recoverable (lock, versions, soft delete).
 - ⚠️ The state endpoint is internet-reachable (authenticated only). This is the main thing to change for a regulated production rollout.

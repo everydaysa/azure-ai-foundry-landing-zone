@@ -14,7 +14,7 @@ This document explains what we protect, from whom, and how each threat is stoppe
 
 ## 2. Security principles
 
-1. **No secrets exist.** No API keys, client secrets, passwords or storage keys. Every principal authenticates with a short-lived token (ADR-0001).
+1. **No secret is used.** No API key, client secret, password or storage key authenticates anything; every principal uses a short-lived token (ADR-0001). Where Azure still generates keys (Foundry, Storage, Log Analytics), local auth is disabled, so they're inert. Inert is not the same as absent (see §4 and §6).
 2. **No public PaaS endpoints.** Foundry and Key Vault have public access disabled and are reachable only via Private Endpoints. ACR is deny-by-default (ADR-0005, 0006).
 3. **Least privilege, split by stage.** Read-only for plans, one resource group per deploy identity, inference-only for the app (ADR-0010).
 4. **Every control is checked twice.** Once before the change (Checkov/OPA), once at runtime (Azure/Kubernetes enforcement), and again nightly (ADR-0009).
@@ -24,7 +24,7 @@ This document explains what we protect, from whom, and how each threat is stoppe
 
 | # | Threat | Example | Controls | Where enforced | Proven by |
 |---|---|---|---|---|---|
-| S1 | **Spoofing**: stolen model API key | Key leaked in code, logs or a laptop | Keys disabled on Foundry (`local_auth_enabled = false`) | Foundry rejects key auth | OPA T1 · Checkov · module test · Owner got `PermissionDenied` without a data-plane role |
+| S1 | **Spoofing**: stolen model API key | Key leaked in code, logs or a laptop | Keys disabled on Foundry (`local_auth_enabled = false`) | Foundry rejects key auth | OPA T1 · Checkov · module test · keys can still be *listed* by control-plane roles but are rejected · Owner got `PermissionDenied` without a data-plane role |
 | S2 | Spoofing: stolen CI credential | Secret exfiltrated from GitHub | **No CI secret exists.** OIDC federation, subject pinned to repo **ID** + context | Entra ID exact subject match | AADSTS700213 when the subject didn't match (the incident in the runbook) |
 | S3 | Spoofing: another pod uses the app identity | Attacker deploys a pod in another namespace | FIC trusts one `namespace:serviceaccount` on one cluster issuer | Entra ID | `/whoami` shows `workload_identity` only for `ai-app/foundry-app` |
 | S4 | Spoofing: pod borrows the node identity | Call IMDS `169.254.169.254` for the kubelet token | NetworkPolicy egress excludes `169.254.0.0/16` | Cilium | `k8s/base/networkpolicy.yaml` · OPA/Checkov on manifests |
@@ -53,6 +53,7 @@ This document explains what we protect, from whom, and how each threat is stoppe
 | The dev deploy identity | Control of the dev RG | Prod; Owner/UAA; roles for users or groups; anything outside `rg-aifz-dev` |
 | A developer laptop | Whatever that human's Entra access allows | A key or kubeconfig that works elsewhere (none exist) |
 | A leaked App Insights connection string | Nothing (ingestion requires Entra) | Ability to write or read telemetry |
+| Owner/Contributor on the RG | Can **list** the inert Foundry keys (`listKeys` is a control-plane action) | Use them: local auth is off. Re-enabling it is blocked in the pipeline (OPA T1) and detected nightly (drift) |
 
 ## 5. Supply chain
 
@@ -70,6 +71,7 @@ This document explains what we protect, from whom, and how each threat is stoppe
 | ACR public endpoint exists (deny-by-default, JIT for CI) | GitHub-hosted runners are outside the VNet | Self-hosted runners in the VNet → ACR fully private (ADR-0006) |
 | Dev AKS on Free tier, regional nodes | Cost and a subscription zone limitation | Prod is Standard + 3 zones, enforced by OPA T7 |
 | Solo maintainer approves own prod deploys | One-person project | `prevent_self_review: true` with a team |
+| Inert Foundry/Storage keys are readable via `listKeys` by Owner/Contributor | Azure always generates them; they can't authenticate while local auth is off | Azure Policy **deny** on local auth enabled; custom deploy role without `listKeys`; regenerate keys after any exposure (runbook §7) |
 | No customer-managed keys | Microsoft-managed encryption is sufficient for this data | CMK in Key Vault for Foundry, storage and disks where regulation requires it |
 | No image signing / admission verification | Digest pinning already prevents tag swaps | Notation/Cosign signing + Ratify/Gatekeeper verification |
 | App identity client/object IDs appear in the public smoke-test log | They're identifiers, useless without a token from this cluster | Mask them in the workflow if policy requires |

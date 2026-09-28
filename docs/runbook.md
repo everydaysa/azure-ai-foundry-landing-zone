@@ -109,7 +109,7 @@ gh workflow run deploy-prod.yml --ref main
 make smoke-test ENV=dev          # /healthz /readyz /whoami /chat from inside the cluster
 make policy-k8s ENV=dev          # rendered manifests comply
 make plan ENV=dev && make policy-plan ENV=dev   # live infra matches the code and complies
-make output ENV=dev              # endpoints and names (no secrets exist to show)
+make output ENV=dev              # endpoints and names (no secrets in outputs)
 ```
 
 Proof points for a review or demo:
@@ -149,7 +149,14 @@ AzureActivity | where TimeGenerated > ago(2d) and ResourceGroup =~ "rg-aifz-dev"
 
 ## 7. Credential rotation
 
-**There's nothing to rotate.** No API keys, client secrets, passwords or storage keys exist. Tokens are issued per request and expire within about an hour.
+**Nothing needs routine rotation.** No key, client secret or password is used; tokens are issued per request and expire within about an hour.
+
+**One exception: inert keys.** Azure always generates account keys for Foundry (and storage). With local auth disabled they can't authenticate, but anyone with `listKeys` (Owner/Contributor) can read them. If they're ever displayed or shared, regenerate both. If local auth were re-enabled by mistake, a leaked key would work immediately:
+
+```bash
+AI=$(az cognitiveservices account list -g rg-aifz-dev --query "[0].name" -o tsv)
+for k in key1 key2; do az cognitiveservices account keys regenerate -g rg-aifz-dev -n "$AI" --key-name $k -o none; done
+```
 
 What does need periodic attention:
 - **Model version retirement:** gpt-5.4-mini `2026-03-17` retires around Sep 2027. Update `model_version` in the tfvars via PR.
@@ -194,5 +201,6 @@ Key Vault names stay reserved during the soft-delete window (purge protection is
 | gitleaks `generic-api-key` on `rbac.rego` | Built-in role GUIDs look like keys | Line-level `# gitleaks:allow` with a reason (public IDs, same in every tenant) |
 | Deploy hangs at "waiting for registry" | JIT IP rule not yet effective | The script retries for 150 s; if your egress IP changes mid-run (VPN), re-run |
 | `AppTraces` has rows but `AppRequests` is empty | The distro patches the `fastapi.FastAPI` class, but `main.py` imported it before the patch, so the app instance was never instrumented | Instrument the instance explicitly: `FastAPIInstrumentor.instrument_app(app)` (`app/src/app/telemetry.py`), covered by a regression test |
+| `az cognitiveservices account keys list` returns two keys | `disableLocalAuth` makes keys **unusable, not absent**. Azure always generates them, and control-plane roles can list them | Not a breach while local auth is off. If they were displayed or shared, regenerate both (section 7) |
 | `make: No rule to make target` | Not run from the repo root | `cd` to the repository root |
 | `Error acquiring the state lock` | Another plan/apply holds the lease | Wait (CI uses `-lock-timeout`), or `terraform force-unlock <ID>` only if the holder is dead |
