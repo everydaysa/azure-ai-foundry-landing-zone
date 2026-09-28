@@ -61,15 +61,23 @@ lint: ## TFLint with the azurerm ruleset
 
 # ─── Policy as code ───────────────────────────────────────────────────────
 .PHONY: checkov
-checkov: ## Static security scan of Terraform (Checkov)
-	checkov -d infra --config-file policy/checkov/.checkov.yaml
+checkov: ## Static scan: Terraform + Kubernetes + Dockerfile (Checkov)
+	checkov --config-file policy/checkov/.checkov.yaml
 
 .PHONY: opa-test
 opa-test: ## Unit-test the OPA/Rego policies
 	opa test policy/opa -v
 
+.PHONY: policy-k8s
+policy-k8s: ## OPA rules on the rendered Kubernetes manifests for ENV
+	scripts/opa-eval.sh k8s $(ENV)
+
+.PHONY: policy-plan
+policy-plan: ## OPA rules on the saved Terraform plan for ENV (run `make plan` first)
+	scripts/opa-eval.sh plan $(ENV)
+
 .PHONY: policy
-policy: checkov opa-test ## Run all policy-as-code checks
+policy: checkov opa-test policy-k8s ## Run all offline policy-as-code checks
 
 # ─── Application ──────────────────────────────────────────────────────────
 .PHONY: app-test

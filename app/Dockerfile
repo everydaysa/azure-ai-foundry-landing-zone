@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# checkov:skip=CKV_DOCKER_2: Kubernetes ignores Docker HEALTHCHECK; liveness/readiness probes (/healthz, /readyz) are defined in k8s/base/deployment.yaml
+# checkov:skip=CKV_DOCKER_7: false positive - the base image comes from ARG PYTHON_IMAGE, pinned to python:3.12-slim-bookworm
 # ─── Keyless FastAPI service - production image ───────────────────────────
 # Multi-stage: build tools stay in the builder; the runtime image holds only
 # the virtualenv and our source, runs as a non-root user, and works with a

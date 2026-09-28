@@ -1,0 +1,15 @@
+directory:
+  - .
+framework:
+  - terraform
+  - kubernetes
+  - dockerfile
+compact: true
+quiet: true
+skip-path:
+  - \.terraform
+  - \.venv
+  - _incoming
+  - Claude outputs
+  - generated
+download-external-modules: false
