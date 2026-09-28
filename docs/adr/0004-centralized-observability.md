@@ -20,3 +20,4 @@ Telemetry comes from four sources: AI Foundry (model requests, throttling, conte
 - ✅ A leaked connection string can't inject or spoof telemetry.
 - ⚠️ Ingestion and query use the public Azure Monitor endpoints (Entra-authenticated). **Production extension:** Azure Monitor Private Link Scope (AMPLS) with Private Endpoints, and `internet_ingestion_enabled = false`.
 - ⚠️ The dev cap can drop logs during a runaway incident. That's accepted for dev only.
+- ⚠️ **Measured, not assumed:** idle dev sent 750 MB/day (73% of its 1 GB cap). 82% of the Kubernetes audit rows were lease heartbeats, and Container Insights' default stream group sent ~285 MB/day nobody queried. Container Insights now collects 4 streams every 5 minutes (~465 MB/day expected). The lease filter is documented as a production extension in [observability.md](../observability.md#3-measured-volume-and-the-daily-cap).

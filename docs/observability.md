@@ -11,8 +11,8 @@ Think of it as a security control room: every camera in the building feeds the s
  ─────────────────────────────  ────────────────────────────────────────  ─────────────────────────────────────
  aifz-app (FastAPI)            OpenTelemetry distro → App Insights         AppRequests · AppTraces · AppExceptions
                                authenticated with the WORKLOAD IDENTITY    AppDependencies · AppMetrics
- containers / pods / nodes     Container Insights (DCR, managed identity)  ContainerLogV2 · KubePodInventory
-                                                                           KubeEvents · KubeNodeInventory · InsightsMetrics
+ containers / pods / nodes     Container Insights (DCR, managed identity,  ContainerLogV2 · KubePodInventory
+                               4 selected streams, every 5 min)            KubeEvents · KubeNodeInventory
  AKS control plane             diagnostic setting (resource-specific)      AKSAuditAdmin (every API write)
                                                                            AKSControlPlane (guard, autoscaler)
  AI Foundry                    diagnostic setting (allLogs + metrics)      AzureDiagnostics · AzureMetrics
@@ -30,13 +30,42 @@ Code: `infra/modules/monitoring` (workspace + App Insights), plus a `diag-to-cen
 | **One workspace**, workspace-based App Insights | A single query correlates app, cluster, platform and model; one place for RBAC and retention |
 | **Local auth disabled** on Log Analytics *and* App Insights | The connection string only says *where* to send data. Writing requires an Entra token plus the **Monitoring Metrics Publisher** role, so a leaked string can't inject or forge telemetry. Checkov has no check for this, so **OPA rule T2** enforces it |
 | **Container Insights via DCR with managed identity auth** | No workspace key on the nodes |
+| **Only the streams we query, every 5 minutes** | The default collects every stream every minute. On idle dev, Perf + ContainerInventory + InsightsMetrics were ~285 MB/day that no query used. Node/pod CPU and memory stay available as free platform metrics |
 | `kube-audit-admin` (not full `kube-audit`) | Captures every write to the API server (who changed what) without the volume of every read |
 | Probes excluded from traces | `/healthz` and `/readyz` fire every few seconds; tracing them would be noise and cost |
 | Only the `app` logger is exported | Library debug chatter stays out of the workspace |
 | Resource-context access | A team with access to a resource can read *that resource's* logs without being granted the whole workspace |
 | Dev: 30 days, 1 GB/day cap · Prod: 90 days, no cap | Dev can't run up a bill; prod never drops security evidence |
 
-## 3. Ready-to-run KQL
+## 3. Measured volume and the daily cap
+
+The cap is a guardrail. When it trips, ingestion stops for the rest of the day, **security audit and app traces included**. So the design goal is that it never trips. Measured on idle dev (24 h, 2 nodes):
+
+| Table | MB/day | Finding |
+|---|---|---|
+| AKSAuditAdmin | 322 | **82% of rows are `update leases`**: controllers renewing leader-election heartbeats every few seconds. No security value |
+| Perf | 154 | Not used by any query → no longer collected |
+| ContainerInventory | 94 | Not used → no longer collected |
+| InsightsMetrics | 37 | Not used → no longer collected |
+| KubePodInventory | 32 | Used; collected every 5 min instead of every 1 min |
+| **Total billable** | **750 of 1,024** | **73% of the cap while idle** |
+
+After trimming Container Insights, the expected total is about **465 MB/day** (~45% of the cap).
+
+**Production extension: filter lease heartbeats at ingestion (~265 MB/day more).** A workspace transformation on `AKSAuditAdmin` can drop only the lease renewals and keep every other write. It isn't automated here on purpose. The workspace must reference the transformation rule, and the rule must reference the workspace, which azurerm can't express in one apply (the provider's own acceptance test uses two passes). The options are an `azapi_update_resource` patch after both exist, or a documented two-pass deploy. For this project, the measured numbers and the exact rule are the deliverable:
+
+```kusto
+// Workspace transformation for AKSAuditAdmin (drops only lease renewals; every other write is kept)
+source | where not(Verb == "update" and tostring(ObjectRef.resource) == "leases")
+```
+
+```kusto
+// Re-measure: billable MB per table, last 24 h
+Usage | where TimeGenerated > ago(1d) and IsBillable
+| summarize MB = round(sum(Quantity), 1) by DataType | order by MB desc
+```
+
+## 4. Ready-to-run KQL
 
 Open the workspace **log-aifz-dev** → *Logs* in the Azure portal, or use the CLI (section 4).
 
@@ -144,7 +173,7 @@ union
 | order by TimeGenerated asc
 ```
 
-## 4. From the command line
+## 5. From the command line
 
 ```bash
 WS=$(az monitor log-analytics workspace show -g rg-aifz-dev -n log-aifz-dev --query customerId -o tsv)
@@ -154,7 +183,7 @@ az monitor log-analytics query -w "$WS" -o table --analytics-query '
 
 Reading logs needs **Log Analytics Reader** (or higher) on the workspace or on the resource whose logs you want (resource-context access).
 
-## 5. Signals worth alerting on (production extension)
+## 6. Signals worth alerting on (production extension)
 
 | Alert | Query basis | Why |
 |---|---|---|

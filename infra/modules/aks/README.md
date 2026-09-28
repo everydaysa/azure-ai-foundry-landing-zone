@@ -41,7 +41,7 @@ No secret is stored anywhere. A different ServiceAccount, or the same one in ano
 | Admission control | Azure Policy add-on (Gatekeeper / OPA) |
 | Secrets | Key Vault Secrets Store CSI driver with rotation |
 | Patching | `automatic_upgrade_channel = "patch"`, `node_os_upgrade_channel = "NodeImage"`, Image Cleaner |
-| Observability | Container Insights via a Data Collection Rule with managed-identity auth; control-plane audit logs |
+| Observability | Container Insights via a Data Collection Rule with managed-identity auth, collecting only logs, events and inventory every 5 min (`container_insights_streams`, `container_insights_interval`); control-plane audit logs |
 | Least-privilege control plane | User-assigned identity with **Network Contributor on the VNet only**, granted *before* the cluster exists |
 
 Checkov: 17 passed, 4 skipped with justification (ADR-0007):
