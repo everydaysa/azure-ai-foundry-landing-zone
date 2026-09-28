@@ -3,6 +3,10 @@ data "azurerm_client_config" "current" {}
 locals {
   repo_full_name = "${var.github_owner}/${var.github_repo}"
 
+  # The repository part of GitHub's OIDC subject claim: "owner@id/repo@id" when
+  # the IDs are known (immutable-ID format), otherwise the classic "owner/repo".
+  oidc_repo_claim = var.github_owner_id == null ? local.repo_full_name : "${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
+
   tags = merge({
     project    = var.project
     managed_by = "terraform"

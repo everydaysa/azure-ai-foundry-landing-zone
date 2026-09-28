@@ -31,6 +31,29 @@ variable "github_repo" {
   type        = string
 }
 
+variable "github_owner_id" {
+  description = <<-EOT
+    Numeric ID of the GitHub owner (gh api repos/<owner>/<repo> --jq .owner.id).
+    Newer repositories put immutable IDs in the OIDC subject
+    ("repo:<owner>@<owner_id>/<repo>@<repo_id>:..."), so a deleted-and-recreated
+    repo with the same name can't inherit the Azure trust. null = classic
+    name-only subject.
+  EOT
+  type        = number
+  default     = null
+}
+
+variable "github_repo_id" {
+  description = "Numeric ID of the GitHub repository (gh api repos/<owner>/<repo> --jq .id). See github_owner_id."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = (var.github_repo_id == null) == (var.github_owner_id == null)
+    error_message = "Set both github_owner_id and github_repo_id, or neither."
+  }
+}
+
 variable "operator_object_ids" {
   description = <<-EOT
     Extra Entra object IDs (humans or groups) who operate the platform. They get
