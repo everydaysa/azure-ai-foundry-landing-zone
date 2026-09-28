@@ -21,17 +21,17 @@ locals {
     {
       plan-pull-request = {
         identity = "plan"
-        subject  = "repo:${local.repo_full_name}:pull_request"
+        subject  = "repo:${local.oidc_repo_claim}:pull_request"
       }
       plan-main-branch = {
         identity = "plan"
-        subject  = "repo:${local.repo_full_name}:ref:refs/heads/main"
+        subject  = "repo:${local.oidc_repo_claim}:ref:refs/heads/main"
       }
     },
     {
       for env in var.environments : "${env}-environment" => {
         identity = env
-        subject  = "repo:${local.repo_full_name}:environment:${env}"
+        subject  = "repo:${local.oidc_repo_claim}:environment:${env}"
       }
     }
   )

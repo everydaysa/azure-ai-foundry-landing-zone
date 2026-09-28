@@ -3,6 +3,7 @@
 #  Principal            Scope                     Role
 #  ───────────────────  ────────────────────────  ─────────────────────────────────────────
 #  gh-plan              rg-<p>-<env> (each)       Reader
+#  gh-plan              rg-<p>-<env> (each)       AKS Cluster User (refresh needs listClusterUserCredential)
 #  gh-plan/dev/prod     tfstate container         Storage Blob Data Contributor (state lock)
 #  gh-<env>             rg-<p>-<env>              Contributor
 #  gh-<env>             rg-<p>-<env>              RBAC Administrator  ◀ ABAC-constrained
@@ -84,6 +85,20 @@ resource "azurerm_role_assignment" "plan_reader" {
   principal_id         = azurerm_user_assigned_identity.github["plan"].principal_id
   principal_type       = "ServicePrincipal"
   description          = "Pull-request plans and drift detection are read-only."
+}
+
+# Refreshing azurerm_kubernetes_cluster calls listClusterUserCredential, a POST
+# action Reader doesn't include. With Entra-only auth + Azure RBAC and local
+# accounts disabled, the returned kubeconfig holds NO credential: it only
+# tells kubectl to fetch an Entra token, and Kubernetes RBAC still applies.
+resource "azurerm_role_assignment" "plan_aks_user" {
+  for_each = azurerm_resource_group.env
+
+  scope                = each.value.id
+  role_definition_name = "Azure Kubernetes Service Cluster User Role"
+  principal_id         = azurerm_user_assigned_identity.github["plan"].principal_id
+  principal_type       = "ServicePrincipal"
+  description          = "Terraform refresh of the AKS cluster (listClusterUserCredential). Grants no Kubernetes access."
 }
 
 # ─── Deploy identities: one environment each ──────────────────────────────

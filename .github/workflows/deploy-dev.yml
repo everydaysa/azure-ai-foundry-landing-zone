@@ -1,0 +1,87 @@
+# ─── 3/5  Deploy dev: every merge to main ─────────────────────────────────
+#
+#   push to main ──▶ job "deploy" (environment: dev)
+#                     │ OIDC subject "repo:<owner>/<repo>:environment:dev" ──▶ id-aifz-gh-dev
+#                     ├─ terraform plan ─▶ OPA on the plan ─(deny = stop)─▶ terraform apply
+#                     ├─ build ─▶ JIT registry firewall ─▶ push ─▶ digest
+#                     ├─ render ─▶ OPA on the manifests ─(deny = stop)─▶ az aks command invoke apply
+#                     └─ in-cluster smoke test (/healthz /readyz /whoami /chat)
+#
+# The "dev" environment only accepts runs from main (deployment branch policy),
+# so a feature branch can't borrow the dev identity by naming the environment.
+name: deploy-dev
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - "app/**"
+      - "k8s/**"
+      - "policy/**"
+      - "scripts/**"
+      - "Makefile"
+      - ".github/workflows/deploy-dev.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-dev # never two deploys of the same environment at once
+  cancel-in-progress: false # never kill an apply half-way
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ENV_NAME: dev
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }} # environment-level variable: the dev identity
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+      TF_IN_AUTOMATION: "true"
+      TF_CLI_ARGS_plan: "-lock-timeout=10m"
+      TF_CLI_ARGS_apply: "-lock-timeout=10m"
+    steps:
+      - name: Mask deployment identifiers in logs (public repo)
+        run: |
+          echo "::add-mask::${ARM_SUBSCRIPTION_ID}"
+          echo "::add-mask::${ARM_TENANT_ID}"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.16.0"
+          terraform_wrapper: false
+      - uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: "1.21.0"
+      - uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # ─── Infrastructure ───────────────────────────────────────────────
+      - name: terraform plan
+        run: make plan ENV="$ENV_NAME"
+      - name: OPA policy gate (plan)
+        run: make policy-plan ENV="$ENV_NAME"
+      - name: terraform apply (the saved, policy-checked plan)
+        run: make apply ENV="$ENV_NAME"
+
+      # ─── Application ──────────────────────────────────────────────────
+      - name: Azure CLI login (OIDC, same dev identity)
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build, push (JIT firewall), policy-check and deploy by digest
+        run: make deploy-app ENV="$ENV_NAME"
+      - name: In-cluster smoke test
+        run: make smoke-test ENV="$ENV_NAME"

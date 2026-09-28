@@ -24,7 +24,7 @@ log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 out() { terraform -chdir="$TF_DIR" output -raw "$1"; }
 
 [[ -d "$TF_DIR" && -d "$OVERLAY" ]] || { echo "unknown environment: $ENV"; exit 1; }
-for tool in terraform az docker kubectl python3 curl; do
+for tool in terraform az docker kubectl python3 curl opa; do
   command -v "$tool" >/dev/null || { echo "missing tool: $tool"; exit 1; }
 done
 
@@ -86,6 +86,9 @@ kubectl kustomize "$OVERLAY" > "$WORK/manifest.yaml"
 grep -q 'PLACEHOLDER' "$WORK/manifest.yaml" && { echo "unreplaced placeholder in manifest"; exit 1; }
 grep -q '@sha256:0000000000' "$WORK/manifest.yaml" && { echo "placeholder digest in manifest"; exit 1; }
 echo "rendered $(grep -c '^kind:' "$WORK/manifest.yaml") objects"
+
+log "Policy gate: OPA on the rendered manifests (a violation stops the deploy)"
+"$ROOT/scripts/opa-eval.sh" k8s "$ENV"
 
 log "Applying to $AKS (private cluster, via az aks command invoke)"
 ( cd "$WORK" && az aks command invoke -g "$RG" -n "$AKS" --file manifest.yaml \

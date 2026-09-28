@@ -61,7 +61,7 @@ lint: ## TFLint with the azurerm ruleset
 
 # ─── Policy as code ───────────────────────────────────────────────────────
 .PHONY: checkov
-checkov: ## Static scan: Terraform + Kubernetes + Dockerfile (Checkov)
+checkov: ## Static scan: Terraform + Kubernetes + Dockerfile + GitHub Actions (Checkov)
 	checkov --config-file policy/checkov/.checkov.yaml
 
 .PHONY: opa-test
