@@ -65,6 +65,8 @@ make bootstrap
 make plan ENV=dev && make policy-plan ENV=dev && make apply ENV=dev
 make deploy-app ENV=dev
 make smoke-test ENV=dev
+make ask ENV=dev PROMPT="Explain a private endpoint in one sentence."
+make security-test ENV=dev     # PASS/FAIL for every security control, from outside and inside the cluster
 make destroy ENV=dev           # tear down (dev costs ≈ $9–11/day while running)
 ```
 
@@ -80,7 +82,7 @@ infra/
 app/                  FastAPI service: workload identity, OpenAI v1 SDK, OpenTelemetry, 16 tests
 k8s/                  Kustomize base + overlays: PSA restricted, default-deny NetworkPolicies
 policy/               Checkov config + OPA rules (Terraform plan + Kubernetes) with tests
-scripts/              deploy-app · smoke-test · opa-eval · plan-fingerprint · github-settings
+scripts/              deploy-app · smoke-test · ask · security-test · opa-eval · plan-fingerprint · github-settings
 .github/workflows/    ci · plan · deploy-dev · deploy-prod · drift
 docs/                 architecture (+ diagram) · security · observability · runbook · ADRs
 ```

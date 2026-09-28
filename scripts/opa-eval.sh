@@ -46,7 +46,10 @@ case "$MODE" in
     else
       SRC="k8s/base"
     fi
-    { kubectl kustomize "$ROOT/$SRC"; echo "---"; cat "$ROOT/k8s/tools/smoke-test.yaml"; } >"$WORK/all.yaml"
+    {
+      kubectl kustomize "$ROOT/$SRC"
+      for f in "$ROOT"/k8s/tools/*.yaml; do echo "---"; cat "$f"; done
+    } >"$WORK/all.yaml"
 
     # One YAML document per file (OPA reads a single document per input).
     awk -v dir="$WORK" 'BEGIN { n = 0 }
